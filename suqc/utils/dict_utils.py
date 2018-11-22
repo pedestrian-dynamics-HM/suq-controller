@@ -9,7 +9,7 @@ from typing import List
 from copy import deepcopy
 from functools import reduce
 
-
+import numpy as np
 
 # --------------------------------------------------
 # people who contributed code
@@ -215,7 +215,7 @@ def deep_dict_lookup(d: dict, key: str, check_final_leaf=True, check_unique_key=
             else:                            # remove last key again from list
                 current_path = current_path[:-1]
         else:
-            # if/else statement: if loop ended normally then run this: remove last key from path and remove this
+            # for-else statement: if loop ends normally then run this: remove last key from path and remove this
             # entry from the stack
             current_path = current_path[:-1]
             stack.pop()
@@ -276,6 +276,13 @@ def change_value(d: dict, path: list, last_key: str, exist_val, new_value):
         # check for numerical types (casting between float and integer)
         if isinstance(exist_val, numbers.Number) and isinstance(new_value, numbers.Number):
 
+            try:
+                # NumPy numbers are not seriazable in JSON, therefore make sure to store a Python internal number
+                # See: https://stackoverflow.com/questions/11942364/typeerror-integer-is-not-json-serializable-when-serializing-json-in-python
+                new_value = np.asscalar(new_value)
+            except AttributeError:
+                pass  # Do nothing when it fails, then it is most likely already a Python native scalar
+
             # ignore cases, in case there are wrappers around the float (such as from float <-> np.float64)
             if isinstance(exist_val, float) and isinstance(new_value, float) or \
                     isinstance(exist_val, int) and isinstance(new_value, int):
@@ -287,7 +294,7 @@ def change_value(d: dict, path: list, last_key: str, exist_val, new_value):
             print(f"WARNING: There is a type casting from type {type(new_value)} (set value) to type {exist_val} "
                   f"(existing value)")
             try:
-                new_value = type(exist_val)(new_value)  # try to cast, if it failes raise error
+                new_value = type(exist_val)(new_value)  # try to cast, if it fails raise error
             except ValueError as e:
                 print(f"Type-cast failed for key {last_key} at path {path}.")
                 raise e

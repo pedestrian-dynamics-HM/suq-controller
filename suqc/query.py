@@ -5,12 +5,14 @@
 import subprocess
 import multiprocessing
 
-from suqc.qoi import QoIProcessor, PedestrianEvacuationTimeProcessor, AreaDensityVoronoiProcessor
+from suqc.qoi import *
 from suqc.configuration import EnvironmentManager
 from suqc.parameter.sampling import ParameterVariation, FullGridSampling, RandomSampling, BoxSamplingUlamMethod
 from suqc.parameter.postchanges import ScenarioChanges
 from suqc.parameter.create import VadereScenarioCreation
 from suqc.resultformat import ParameterResult
+
+from typing import List, Union
 
 # --------------------------------------------------
 # people who contributed code
@@ -37,7 +39,9 @@ class Query(object):
 
     def _run_vadere_simulation(self, scenario_fp, output_path):
         model_path = self._env_man.get_model_path()
-        subprocess.call(["java", "-jar", model_path, "suq", "-f", scenario_fp, "-o", output_path])
+
+        loglvl = "OFF"  # TODO: possibly parametrize...
+        subprocess.call(["java", "-jar", model_path, "--loglevel", loglvl, "suq", "-f", scenario_fp, "-o", output_path])
 
     def _single_query(self, kwargs):
         output_path = self._env_man.get_output_path(kwargs["par_id"], create=True)
@@ -82,12 +86,29 @@ class Query(object):
 
 if __name__ == "__main__":
 
+    # from suqc.qoi import *
+    # em = EnvironmentManager("two_density")
+    #
+    # par = FullGridSampling()
+    # par.add_dict_grid({})
+    #
+    # q = AreaDensityVoronoiProcessor(em)
+
+    em = EnvironmentManager("two_density")
+    pv = FullGridSampling()
+    pv.add_dict_grid({"sources.[id==1].spawnNumber": [10, 20]})
+    q0 = CombinedTwoDensityProcessor(em=em)
+
+    one, two = Query(em, pv, q0).run(njobs=1)
+    print(two)
+    exit()
+
     em = EnvironmentManager("corner")
     pv = FullGridSampling()
     pv.add_dict_grid({"speedDistributionStandardDeviation": [0.0, 0.1, 0.2, 0.3], "speedDistributionMean": [1.2, 1.3]})
-    q0 = PedestrianEvacuationTimeProcessor(em)
+    q0 = CountInArea(em, p1=[0, 14], p2=[13, 24])
 
-    Query(em, pv, q0).run(njobs=-1)
+    print(Query(em, pv, q0).run(njobs=-1))
     exit()
 
     #q1 = PedestrianDensityGaussianProcessor(em) # TODO: need to check if qoi-processor is available in basis file!

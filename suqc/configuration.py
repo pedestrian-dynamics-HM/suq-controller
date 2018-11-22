@@ -310,7 +310,8 @@ class EnvironmentManager(object):
 
 
 if __name__ == "__main__":
-    pass
-    #create_environment_from_file(name="fp_operator", filepath=
-    #"/home/daniel/REPOS/vadere_projects/vadere/VadereModelTests/TestOSM/scenarios/New_Simple_FP.scenario",
-    #                             model="vadere")
+    create_environment_from_file(
+        name="two_density",
+        filepath=
+        "/home/daniel/REPOS/vadere/vadere/VadereModelTests/TestOSM/output/corrupt/rimea_11_exit_selection_pso_2018-11-19_14-24-21.542/rimea_11_exit_selection_pso.scenario",
+        model="vadere")

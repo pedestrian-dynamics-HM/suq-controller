@@ -1,0 +1,7 @@
+{
+    "model": "vadere",
+    "suqc_state": {
+        "git_hash": "a83a1a347e05f9326a7f777480211b2eaeb9f259",
+        "umcommited_changes": " M suqc/configuration.py\n M suqc/models/vadere-console_0-6.jar\n?? suqc/suqc_envs/two_density/\n?? suqc/utils/New_SimpleHKHKJ.scenario\n"
+    }
+}

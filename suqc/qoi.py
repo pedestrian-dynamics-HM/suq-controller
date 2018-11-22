@@ -28,14 +28,21 @@ class QoIProcessor(metaclass=abc.ABCMeta):
         self._em = em
         self._proc_name = proc_name
         self._proc_config = self._get_proc_config()
-        self._proc_id = self._proc_config["id"]
+        self._proc_id = self._get_ids_proc()
         self._outputfile_name = self._get_outout_filename()
+
 
     # TODO: think about time selection option (possibly they can also be located in VADERE directly...)
     def read_and_extract_qoi(self, par_id, output_path) -> ParameterResult:
         data = self._read_csv(output_path)
         data = cast_series_if_possible(data)
         return ParameterResult(par_id, data, self.name)
+
+    def _get_ids_proc(self):
+        ids = list()
+        for i in self._proc_config:
+            ids.append(i["id"])
+        return ids
 
     def _get_all_proc_writers(self):
         return self._em.get_value_basis_file(key="processWriters")[0]
@@ -44,14 +51,14 @@ class QoIProcessor(metaclass=abc.ABCMeta):
         procwriter_json = self._get_all_proc_writers()
         procs_list = procwriter_json["processors"]
 
-        return_cfg = None
+        return_cfg = list()
         for d in procs_list:
             if d["type"] == self._proc_name:
-                if return_cfg is None:
-                    return_cfg = d
-                else:
-                    raise RuntimeError(
-                        "The processor has to be unique to avoid confusion which processor to use for the QoI.")
+                return_cfg.append(d)  # append all QoI processors found
+
+                # else:
+                #     raise RuntimeError(
+                #         "The processor has to be unique to avoid confusion which processor to use for the QoI.")
         if return_cfg is None:
             raise KeyError(f"Could not find QoIProcessor with name {self._proc_name}.")
 
@@ -64,17 +71,18 @@ class QoIProcessor(metaclass=abc.ABCMeta):
         file_cfg = None
         for file in files:
             procs_list = file["processors"]
-            if self._proc_id in procs_list:
-                if file_cfg is None:
-                    # Multiple processors for the output file are not allowed, as this mixes up data.
-                    #if len(procs_list) != 1: # TODO: need for qoi Position Processor with multiple defined...
-                    #    raise RuntimeError(f"The processor (id = {self._proc_id})\n {self._proc_name} \n"
-                    #                       f"has multiple processor ids set in the output file. Currently, the only"
-                    #                       f"content in the output file has to be from the processor.")
-                    file_cfg = file
-                else:
-                    raise RuntimeError("The processor has to be unique to avoid confusion which processor to use for "
-                                       "the QoI.")
+
+            for pid in self._proc_id:
+                if pid in procs_list:
+                    # TODO: not best coding... what's needs to be done here:
+                    # TODO: There are multiple processor ids and they all need to have defined in the same file (otherwise there is confusion)
+
+                    if file_cfg is None or file_cfg == file:
+                        file_cfg = file
+                    else:
+                        raise RuntimeError("The processor has to have a unique output file, as there are currently "
+                                           "only single output files allowed. Multiple files is a feature not "
+                                           "implemented yet.")
         return file_cfg["filename"]
 
     def _filepath(self, output_path):
@@ -138,6 +146,10 @@ class AreaDensityVoronoiProcessor(QoIProcessor):
         proc_name = "org.vadere.simulator.projects.dataprocessing.processor.AreaDensityVoronoiProcessor"
         super(AreaDensityVoronoiProcessor, self).__init__(em, proc_name, "voronoiDensity")
 
+    def read_and_extract_qoi(self, par_id, output_path):
+        df = self._read_csv(output_path)
+        return ParameterResult(par_id, df.T, self.name)
+
 
 class InitialAndLastPositionProcessor(QoIProcessor):
     """Measures the initial and the last position of an agent."""
@@ -163,6 +175,51 @@ class InitialAndLastPositionProcessor(QoIProcessor):
         return ParameterResult(par_id, df_first_last, self._name)
 
 
+class CountInArea(QoIProcessor):
+    # TODO: this has to be actually implemented in VADERE as a Data Processor
+
+    def __init__(self, em, p1, p2):
+        proc_name = "org.vadere.simulator.projects.dataprocessing.processor.PedestrianPositionProcessor"
+        self._name = "countPed"
+
+        self.p1 = p1
+        self.p2 = p2
+
+        super(CountInArea, self).__init__(em, proc_name, self._name)
+
+    def read_and_extract_qoi(self, par_id, output_path):
+        data = self._read_csv(output_path)
+
+        x_sec = np.logical_and(data["x"] > self.p1[0], data["x"] < self.p2[0])
+        y_sec = np.logical_and(data["y"] > self.p1[1], data["y"] < self.p2[1])
+        return ParameterResult(par_id,
+                               np.logical_and(x_sec, y_sec).groupby(by="timeStep").apply(lambda x: np.sum(x)),
+                               self._name)
+
+
+class CombinedTwoDensityProcessor(QoIProcessor):
+    # TODO: Specialized QoI ... In future the Query should support allow a list of QoIs, but now it is too much!
+
+    def __init__(self, em, p1, p2):
+        # No need to call super, because this just combines two QoI -- maybe generalize this!
+        self._proc_density = AreaDensityVoronoiProcessor(em)
+        self._proc_count = CountInArea(em, p1=p1, p2=p2)
+        self._proc_name = "two_density"
+
+    def read_and_extract_qoi(self, par_id, output_path):
+
+        df1 = self._proc_density.read_and_extract_qoi(par_id, output_path).data
+        df2 = self._proc_count.read_and_extract_qoi(par_id, output_path).data
+
+        data = np.zeros([3, max(df1.shape[1], df2.shape[1])])
+
+        data[0:2, :df1.shape[1]] = df1.values
+        data[2, :df2.shape[1]] = df2.values
+
+        idx = "density1", "density2", "count"
+        cols = np.arange(1, max(df1.shape[1], df2.shape[1]) + 1)
+        return ParameterResult(par_id, pd.DataFrame(data, index=idx, columns=cols), qoi_name="mixed")
+
 class CustomProcessor(QoIProcessor):
 
     def __init__(self, em: EnvironmentManager, proc_name: str, qoi_name: str):
@@ -170,5 +227,9 @@ class CustomProcessor(QoIProcessor):
 
 
 if __name__ == "__main__":
-    pass
-    #AreaDensityVoronoiProcessor
+    e = EnvironmentManager("two_density")
+    adv = AreaDensityVoronoiProcessor(e)
+
+    pedpos = CountInArea(e)
+
+    print(pedpos)

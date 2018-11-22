@@ -72,19 +72,30 @@ class ChangeRandomNumber(PostScenarioChange):
     KEY_SEED = "fixedSeed"
     KEY_SIM_SEED = "simulationSeed"
 
-    def __init__(self, fixed=False, randint=False, par_id=False):
-        assert fixed + randint + par_id == 1, "Exactly one parameter has to be set to true"
+    def __init__(self, fixed=False, randint=False, par_id=False, vfunc=False, **kwargs):
+        assert fixed + randint + par_id + vfunc == 1, "Exactly one parameter has to be set to true"
         self._isfixed = fixed
         self._fixed_randnr = None
 
         self._israndint = randint
         self._isparid = par_id
 
+        self._isvfunc = vfunc   # allows to set a function
+                                # (INPUT: scenario, par_id, par_var, **self._kwargs) OUTPUT: integer)
+        self._vfunc = None
+        self._kwargs = kwargs
+
         super(ChangeRandomNumber, self).__init__(name="random_number")
 
     def set_fixed_random_nr(self, random_number: int):
         assert self._isfixed, "Modus has to be set to fixed"
         self._fixed_randnr = random_number
+
+    def set_vfunc(self, func):
+        self._vfunc = func
+
+    def _eval_vfunc(self, scenario, par_id, par_var):
+        return self._vfunc(scenario, par_id, par_var, **self._kwargs)
 
     def get_changes_dict(self, scenario, par_id, par_var):
 
@@ -94,6 +105,8 @@ class ChangeRandomNumber(PostScenarioChange):
         elif self._israndint:
             # 4294967295 = max unsigned 32 bit integer
             rnr = np.random.randint(0, 4294967295)
+        elif self._isvfunc:
+            rnr = self._eval_vfunc(scenario, par_id, par_var)
         else:  # --> self._isparid
             rnr = par_id
 

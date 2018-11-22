@@ -366,26 +366,22 @@ class BoxSamplingUlamMethod(ParameterVariation):
 
 
 if __name__ == "__main__":
-    par = BoxSamplingUlamMethod()
-    par.create_grid(["dynamicElements.[id==1].position.x", "dynamicElements.[id==1].position.y", None],
-                    lb=[0, 0, 0], rb=[20, 10, 0], nr_boxes=[20, 10, 0], nr_testf=[1, 1, 0])
 
-
-
-
-
-    par.plot_states(initial_cond)
-
-    exit()
-
-    di = {"speedDistributionStandardDeviation": [0.0, 0.1, 0.2]}
-
-    pd.options.display.max_columns = 4
-
-    em = EnvironmentManager("corner")
-
-    pv = BoxSamplingUlamMethod()
-    pv.create_grid(["speedDistributionStandardDeviation", "speedDistributionMean", "minimumSpeed"], [0, 1, 2], [1, 2, 3], [2, 2, 2], [2, 2, 2])
+    pass
+    # par = BoxSamplingUlamMethod()
+    # par.create_grid(["dynamicElements.[id==1].position.x", "dynamicElements.[id==1].position.y", None],
+    #                 lb=[0, 0, 0], rb=[20, 10, 0], nr_boxes=[20, 10, 0], nr_testf=[1, 1, 0])
+    #
+    # exit()
+    #
+    # di = {"speedDistributionStandardDeviation": [0.0, 0.1, 0.2]}
+    #
+    # pd.options.display.max_columns = 4
+    #
+    # em = EnvironmentManager("corner")
+    #
+    # pv = BoxSamplingUlamMethod()
+    # pv.create_grid(["speedDistributionStandardDeviation", "speedDistributionMean", "minimumSpeed"], [0, 1, 2], [1, 2, 3], [2, 2, 2], [2, 2, 2])
 
 
     #pv = FullGridSampling()

@@ -150,8 +150,8 @@ if __name__ == "__main__":
         #plot3d_eigenfunctions(dmap, color=get_color(df, mode="traj"))
 
 
-    dm = DMAPWrapper(df=df, eps=1, num_eigenpairs=90, mode="fixed")
-    dm.save_pickle()
+    #dm = DMAPWrapper(df=df, eps=1, num_eigenpairs=90, mode="fixed")
+    #dm.save_pickle()
 
     plt.show()
 

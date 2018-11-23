@@ -300,6 +300,9 @@ def simulate(peds, av_runs):
     remove_existing_files()
 
     for i in range(av_runs):
+
+        print(f"Running {i} of {av_runs} average runs.")
+
         pv = suqc.FullGridSampling()
         pv.add_dict_grid({"sources.[id==1].spawnNumber": peds})
 
@@ -307,8 +310,12 @@ def simulate(peds, av_runs):
         #q1 = suqc.CombinedTwoDensityProcessor(ENV_MAN, p1=[0, 0], p2=[20, 20])
 
         pc = create_postchanges(i)
-        parlu, qois = suqc.Query(ENV_MAN, pv, q1, pc).run(njobs=1)
 
+        #with suqc.ServerConnection() as sc:
+        #    ss = suqc.ServerSimulation(sc)
+        #    parlu, qois = ss.run(env_man=ENV_MAN, par_var=pv, qoi=q1, sc=pc)
+
+        parlu, qois = suqc.Query(ENV_MAN, pv, q1, pc).run(njobs=1)
         if i == 0:
             parlu.to_csv(os.path.join(ENV_MAN.env_path, FILE_PARLOOKUP))
         qois.to_csv(os.path.join(ENV_MAN.env_path, FILE_SIMULATION(i)))
@@ -344,11 +351,11 @@ def average_data():
 
 
 if __name__ == "__main__":
-    SIM = False
+    SIM = True
 
     if SIM:
-        peds = np.linspace(10, 100, 25).astype(np.int)
-        avruns = 2
+        peds = np.linspace(10, 100, 50).astype(np.int)
+        avruns = 100
         simulate(peds=peds, av_runs=avruns)
     else:
         df = load_data(FILE_ACCUM)

@@ -58,10 +58,6 @@ class DMAPWrapper(object):
             pickle.dump(self, f)
 
 
-df = load_data(FILE_ACCUM)
-print(df)
-
-
 def plot_eigenvalues(dmap):
     idx = np.arange(0, dmap.eigenvalues.shape[0])
     plt.plot(idx, dmap.eigenvalues, "-*")
@@ -118,11 +114,6 @@ def plot3d_eigenfunctions(dmap, color):
         ax.set_xlabel(f"$\Psi_{{{p[0]}}}$"), ax.set_ylabel(f"$\Psi_{{{p[1]}}}$"), ax.set_zlabel(f"$\Psi_{{{p[2]}}}$")
 
 
-ep = np.sqrt(np.median(squareform(pdist(df.values, metric="sqeuclidean"))))
-
-factors = [0.5]
-
-
 def get_color(df, mode):
     if mode == "time":
         return plt.get_cmap("plasma"), df.index.get_level_values(1).values
@@ -132,12 +123,19 @@ def get_color(df, mode):
         raise ValueError
 
 
-get_color(df, mode="traj")
-
 
 if __name__ == "__main__":
+    df = load_data(FILE_ACCUM)
+    print(df)
 
-    plot_single_trajectories(df, par_ids=[0, 10, 15, 24])
+    ep = np.sqrt(np.median(squareform(pdist(df.values, metric="sqeuclidean"))))
+
+    factors = [1, 0.7, 0.5, 0.4, 0.3]
+    factors = []
+
+    get_color(df, mode="traj")
+
+    #plot_single_trajectories(df, par_ids=[0, 10, 15, 24])
 
     for f in factors:
 
@@ -150,8 +148,8 @@ if __name__ == "__main__":
         #plot3d_eigenfunctions(dmap, color=get_color(df, mode="traj"))
 
 
-    #dm = DMAPWrapper(df=df, eps=1, num_eigenpairs=90, mode="fixed")
-    #dm.save_pickle()
+    dm = DMAPWrapper(df=df, eps=0.5, num_eigenpairs=100, mode="fixed")
+    dm.save_pickle()
 
     plt.show()
 

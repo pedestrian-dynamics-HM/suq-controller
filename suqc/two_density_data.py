@@ -249,7 +249,7 @@ def animate_data_full(df):
     line_ani = animation.FuncAnimation(fig, update_plots, timesteps, fargs=(trajectories, lines, left_side_plots),
                                        interval=100, blit=False)
 
-    line_ani.save('lines.mp4', writer=writer)
+    #line_ani.save('lines.mp4', writer=writer)
 
     plt.show()
 
@@ -351,7 +351,7 @@ def average_data():
 
 
 if __name__ == "__main__":
-    SIM = True
+    SIM = False
 
     if SIM:
         peds = np.linspace(10, 100, 50).astype(np.int)
@@ -362,8 +362,8 @@ if __name__ == "__main__":
 
         print(df)
 
-        #plot_data(df)
-        #plot3d(df)
+        plot_data(df)
+        plot3d(df)
         animate_data_full(df)
 
 

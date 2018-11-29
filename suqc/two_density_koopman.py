@@ -21,154 +21,178 @@ __credits__ = ["n/a"]
 # --------------------------------------------------
 
 
-def compute_koopman(df, dmap, plot=False):
-    phi = dmap.eigenvectors
-    phi, sval, _ = np.linalg.svd(phi.T, full_matrices=False)
-    #phi, _ = np.linalg.qr(phi.T, mode="reduced")
+class Koopman(object):
 
+    def __init__(self, dmap, data, mode: str="k"):
 
-    # TODO: check if all are the same length, later possibly generalize to different lengths
-    len_traj = len(np.unique(df.index.get_level_values(1).values))
-    all_idx = np.arange(0, df.shape[0])
+        assert mode in ["k", "fp"]
 
-    idx_old = all_idx[~(df.index.get_level_values(1) == len_traj)]  # remove last position of trajectory
-    idx_new = all_idx[~(df.index.get_level_values(1) == 1)]  # remove first position of trajectory (note starts at 1 not 0)
+        self._mode = mode
+        self._dmap = dmap
 
-    #idx_old = list(set(np.arange(7525)).difference(set(np.arange(301, 7525, 301))))[:-1]
-    #idx_new = list(set(np.arange(7525)).difference(set(np.arange(0, 7525+1, 301))))
+        self._v_data = data
+        self._v_basis = None
 
-    phi_old = phi[idx_old, :]  # columns are time, rows are space
-    phi_new = phi[idx_new, :]
+    def _compute_shift_indices(self):
+        all_idx = np.arange(0, self._v_data.shape[0])
 
-    #idx = pd.IndexSlice
-    #phi_old = df.loc[idx[:, np.arange(1, len_traj)], :]
-    #phi_new = df.loc[idx[:, np.arange(2, len_traj+1)], :].values
+        # TODO: check if all are the same length, later possibly generalize to different lengths
+        len_traj = len(np.unique(self._v_data.index.get_level_values(1).values))
 
-    #K = np.linalg.pinv(phi_old, rcond=1E-13) @ phi_new
+        # remove last position of trajectory
+        idx_old = all_idx[~(self._v_data.index.get_level_values(1) == len_traj)]
 
-    K = np.linalg.lstsq(phi_old, phi_new, rcond=1E-14)[0]
+        # remove first position of trajectory (note starts at 1 not 0)
+        idx_new = all_idx[~(self._v_data.index.get_level_values(1) == 1)]
+        return idx_old, idx_new
 
-    #Qold, Rold = np.linalg.qr(phi_old, mode="reduced")  # TODO: more stable lstsq, but there is almost no difference...
-    #K = np.linalg.solve(Rold, Qold.T@phi_new)
+    def realdata_basis(self):
+        idx_old, _ = self._compute_shift_indices()
+        return self._v_data.iloc[idx_old, :]
 
-    evK, psiKright = np.linalg.eig(K)
-    B = psiKright @ np.diag(evK)  # Can be speed up by multiplying elementwise with row vector
-    psiKleft = np.linalg.solve(B, K)
-    del B
+    def _compute_shift_matrices(self):
+        idx_old, idx_new = self._compute_shift_indices()
 
-    print(f"Residual Euclidean 2-norm eigendecomposition: {np.linalg.norm(psiKright @ np.diag(evK) @ psiKleft - K)}")
+        phi = self._dmap.eigenvectors.T  # TODO: this is transposed, because the DMAP from Juan is assumed
 
-    t = f"There are {np.sum(np.abs(evK) > 1)}/{len(evK)} eigenvals larger than 1, max abs. value = {np.max(np.abs(evK))}"
-    print(t)
+        # TODO: orthogonalization methods -- seem not to have much impact currently.
+        #phi, sval, _ = np.linalg.svd(phi.T, full_matrices=False)
+        #phi, _ = np.linalg.qr(phi)
 
-    if plot:
-        plt.figure()
-        plt.plot(np.real(evK), np.imag(evK), '*')
-        plt.plot(np.cos(np.linspace(0, 2 * np.pi, 200)), np.sin(np.linspace(0, 2 * np.pi, 200)))
-        plt.title(t)
-        plt.axis("equal")
+        phi_old = phi[idx_old, :]  # columns are time, rows are space
+        phi_new = phi[idx_new, :]
+        return phi_old, phi_new
 
-    return phi_old, evK, psiKleft, psiKright
+    def _compute_basis(self):
+        return self._compute_shift_matrices()[0]  # phi_old
 
-#ev2, Sinv2 = np.linalg.eig(K.T)
-#Sinv2 = Sinv2.T
-#ev, S2 = np.linalg.eig(K)
+    def _compute_func_coeff(self):
+        func_coeffs = []
 
+        self._compute_bump()
 
-# eigenvectors are column wise and normed https://docs.scipy.org/doc/scipy/reference/generated/scipy.linalg.eig.html
-#evK, psiKleft, psiKright = linalg.eig(K, left=True, right=True)  # K = S \L S^-1  <-> K S = S \L <-> S^-1 K = \L S^-1
-#S, Sinv = psiKright, np.linalg.inv(psiKright)
+        phi_old, _ = self._compute_shift_matrices()
+        df_basis = self.realdata_basis()
 
-def get_bump_column_old(df):
-    idx = pd.IndexSlice
-    quantity = "areaVoronoiDensity.2"
-    q0 = df.loc[:, idx["QoI_voronoiDensity_scalar", "areaVoronoiDensity.2"]]
-    #q0[np.logical_and(20 <= q0, q0 <= 30)] = 1
-    #q0[~np.logical_and(5 <= q0, q0 <= 10)] = 0
+        for i in range(self._v_data.shape[1]):
+            ck, res = np.linalg.lstsq(phi_old, df_basis.iloc[:, i], rcond=1E-14)[:2]
+            print(f"Sums of residuals; squared Euclidean 2-norm least-square parameter {i}: {res}")
+            func_coeffs.append(ck)
 
-    from scipy.stats import norm
+        return func_coeffs
 
-    weight = norm.pdf(q0, loc=7.5, scale=1)
-    q0 = weight
-    df.loc[:, idx["QoI_voronoiDensity_scalar", "bump"]] = q0
+    def _compute_eigdecomp_K(self, plot):
+        phi_old, phi_new = self._compute_shift_matrices()
 
-    plt.figure()
-    plt.plot(df.loc[:, idx["QoI_voronoiDensity_scalar", "areaVoronoiDensity.2"]], q0, '*')
-    plt.title(quantity)
-    return df
+        # K = np.linalg.pinv(phi_old, rcond=1E-13) @ phi_new
+        if self._mode == "k":
+            K = np.linalg.lstsq(phi_old, phi_new, rcond=1E-14)[0]
+        else: # mode == "fp"
+            K = np.linalg.lstsq(phi_old, phi_new, rcond=1E-14)[0].T
 
+        # TODO: more stable lstsq, but there is almost no difference...
+        # Qold, Rold = np.linalg.qr(phi_old, mode="reduced")
+        # K = np.linalg.solve(Rold, Qold.T@phi_new)
 
-def get_bump_column(df):
-    point = df.iloc[450*25, :]  # starting value of T1
+        evK, psiKright = np.linalg.eig(K)
+        B = psiKright @ np.diag(evK)  # TODO: Can speed up by multiplying elementwise with row vector
+        psiKleft = np.linalg.solve(B, K)
+        del B
 
-    #vals = norm.pdf(df.values, loc=point, scale=3)
-    #kde = gaussian_kde(df.values.T)
-    #vals = kde(df.values.T)
+        print(f"Residual Euclidean 2-norm eigendecomposition: {np.linalg.norm(psiKright @ np.diag(evK) @ psiKleft - K)}")
 
-    from scipy.stats import norm, gaussian_kde, multivariate_normal
+        t = f"There are {np.sum(np.abs(evK) > 1)}/{len(evK)} eigenvals larger than 1, max abs. value = {np.max(np.abs(evK))}"
+        print(t)
 
-    vals = multivariate_normal(point, 20).pdf(df.values)*100000
-    idx = pd.IndexSlice
-    #df.loc[:, idx["QoI_voronoiDensity_scalar", "bump"]] = vals
+        if plot:
+            plt.figure()
+            plt.plot(np.real(evK), np.imag(evK), '*')
+            plt.plot(np.cos(np.linspace(0, 2 * np.pi, 200)), np.sin(np.linspace(0, 2 * np.pi, 200)))
+            plt.title(t)
+            plt.axis("equal")
 
-    df.loc[:, idx["QoI_voronoiDensity_scalar", "bump"]] = df.iloc[:, 1].values
+        return phi_old, evK, psiKleft, psiKright
 
-    return df
+    def _compute_bump(self):
+        from scipy.stats import multivariate_normal
+        point = self._v_data.iloc[400 * 25, :]  # starting value of T1
+        vals = multivariate_normal(point, 20).pdf(self._v_data.values) * 100000
+        idx = pd.IndexSlice
+        self._v_data.loc[:, idx["QoI_voronoiDensity_scalar", "bump"]] = vals
 
-def compute_func_coeff(df, dmap):
+    def solve_kooman_system(self):
 
-    func_coeffs = []
+        func_coeffs = self._compute_func_coeff()
+        phi_old, evK, psiKleft, psiKright = self._compute_eigdecomp_K(plot=False)
 
-    #df = get_bump_column_old(df)
-    df = get_bump_column(df)
+        nr_func = len(func_coeffs)
 
-    all_idx = np.arange(0, df.shape[0])
-    len_traj = len(np.unique(df.index.get_level_values(1).values))
-    idx_old = all_idx[~(df.index.get_level_values(1) == len_traj)]  # remove last position of trajectory
-    idx_new = all_idx[~(df.index.get_level_values(1) == 1)]  # remove first position of trajectory (note starts at 1 not 0)
+        NT = 300
+        res = list()
 
-    phi = dmap.eigenvectors
-    phi, sval, _ = np.linalg.svd(phi.T, full_matrices=False)
-    phi_old = phi[idx_old, :]  # columns are time, rows are space
+        for i in range(nr_func):
+            cg0 = func_coeffs[i]
+            ci = np.zeros([cg0.shape[0], NT])
 
-    idx = all_idx[df.index.get_level_values(1) == 1]
-    phi_old_ls = phi[idx, :]
-    for i in range(df.shape[1]):
-        ck, res = np.linalg.lstsq(phi_old, df.iloc[idx_old, i], rcond=1E-14)[:2]
-        print(f"Sums of residuals; squared Euclidean 2-norm least-square parameter {i}: {res}")
-        func_coeffs.append(ck)
+            g0t = np.zeros([phi_old.shape[0], NT])
 
-    return func_coeffs
+            # cur_K = np.eye(K.shape[0])
+            # np.linalg.matrix_power(K, t)
 
-    # write basis in terms of Koopman basis
-    # E = np.zeros_like(phi_old)
-    # for j in range(E.shape[1]):
-    #     E[:, j] = coefs_orig(basis=psiK, func_vals=phi_old[:, j])
+            for t in range(NT):
+                # ci[:, t] = np.linalg.matrix_power(K, t) @ cg0
 
+                # according to equation
+                # ci[:, t] = np.real(psiKright @ np.diag(evK**t) @ psiKleft @ cg0)  # TODO: add check how large imag part is
 
-@DeprecationWarning
-def animate_function(m):
-    import matplotlib.animation as animation
+                # speed up (make n**2 instead of n**3):
+                vec = psiKleft @ cg0
+                vec = evK**t * vec
+                ci[:, t] = np.real(psiKright @ vec)
+                g0t[:, t] = phi_old @ ci[:, t]
+            res.append(g0t)
+        return res
 
-    idx = pd.IndexSlice
-    manifold_points = df.iloc[idx_old, :].loc[:, idx["QoI_voronoiDensity_scalar", "areaVoronoiDensity.2"]]
+    def compute_relative_residual(self):
 
-    fig, ax = plt.subplots()
-    line, = ax.plot(manifold_points, m[:, 0], '*')
+        kdata_list = self.solve_kooman_system()
+        df_basis = self.realdata_basis()
 
-    def update_plots(i):
-        line.set_ydata(m[:, i])
-        return line,
+        res = 0
+        for i, kdata in enumerate(kdata_list):
 
-    line_ani = animation.FuncAnimation(fig, update_plots, range(m.shape[1]), interval=100, blit=True)
-    plt.show()
+            kdata = kdata[np.arange(0, 15000, 300), :]
+            edata = df_basis.iloc[:, i].values
+            edata = edata.reshape([50, 300])
+
+            norm_factor = np.max(np.abs(edata))
+
+            diff_vals = np.abs(edata - kdata) / norm_factor
+            resid = np.sum(diff_vals)
+
+            res += resid
+        return res
+
+    @staticmethod
+    def plot_res_eps_range(df, eps_range, num_eigenpars: int=100):
+        res = np.zeros_like(eps_range)
+
+        for i, eps in enumerate(eps_range):
+            print(f"{i}/{len(eps_range)}")
+            dmap = DMAPWrapper(df=df, eps=eps, num_eigenpairs=num_eigenpars, mode="fixed")
+            kpm = Koopman(dmap=dmap, data=df, mode="k")
+            res[i] = kpm.compute_relative_residual()
+
+        plt.plot(eps_range, res, '-*')
+        plt.show()
+
 
 
 def plot_blocks(m):
     fig = plt.figure()
-    fig.subplots_adjust(hspace=0.01)
+    fig.subplots_adjust(hspace=0.00)
 
-    t_factor = 5
+    t_factor = 30
     vmin, vmax = np.min(m[:, 5]), np.max(m[:, 5])
 
     for i in range(5):
@@ -183,56 +207,27 @@ def plot_blocks(m):
 
         ax.imshow(col, vmin=vmin, vmax=vmax)
 
-def animate_first_block():
-    pass
-
-
-def solve_koopman_system(phi_old, evK, psiKleft, psiKright, func_coeffs):
-    NT = 300
-    cg0 = func_coeffs
-    ci = np.zeros([cg0.shape[0], NT])
-
-    g0t = np.zeros([phi_old.shape[0], NT])
-
-    #cur_K = np.eye(K.shape[0])
-    #np.linalg.matrix_power(K, t)
-
-    for t in range(NT):
-        #ci[:, t] = np.linalg.matrix_power(K, t) @ cg0
-
-        # according to equation
-        #ci[:, t] = np.real(psiKright @ np.diag(evK**t) @ psiKleft @ cg0)  # TODO: add check how large imag part is
-
-        # speed up (make n**2 instead of n**3):
-        vec = psiKleft @ cg0
-        vec = evK**t * vec
-        ci[:, t] = np.real(psiKright @ vec)
-        g0t[:, t] = phi_old @ ci[:, t]
-    return g0t
-
 
 if __name__ == "__main__":
 
     df = load_data(FILE_ACCUM)
+
+
+    Koopman.plot_res_eps_range(df=df, eps_range=[130])
+    exit()
+
     dmap = DMAPWrapper.load_pickle()
+    kpm = Koopman(dmap=dmap, data=df, mode="k")
 
-    all_idx = np.arange(0, df.shape[0])
-    len_traj = len(np.unique(df.index.get_level_values(1).values))
-    idx_old = all_idx[~(df.index.get_level_values(1) == len_traj)]  # remove last position of trajectory
-    idx_new = all_idx[~(df.index.get_level_values(1) == 1)]  # remove first position of trajectory (note starts at 1 not 0)
+    kdata_list = kpm.solve_kooman_system()
+    idx_old, _ = kpm._compute_shift_indices()
 
-    phi_old, evK, psiKleft, psiKright = compute_koopman(df, dmap, plot=True)
-    func_coeffs = compute_func_coeff(df, dmap)
+    df_basis = kpm.realdata_basis()
 
-    for i in range(df.shape[1]):
-        kdata = solve_koopman_system(phi_old, evK, psiKleft, psiKright, func_coeffs[i])
+    for i, kdata in enumerate(kdata_list):
         kdata = kdata[np.arange(0, 15000, 300), :]
 
-        #kdata = kdata[:, 0].reshape([50, 300])  # TODO: can be used to check how well the transformation in ck and back worked
-
-        #kdata = solve_koopman_system(i)[:, 0].reshape([50, 300])
-
-        edata = df.iloc[idx_old, i].values  # the entire observation function (as from VADERE)
+        edata = df_basis.iloc[:, i].values  # the entire observation function (as from VADERE)
         edata = edata.reshape([50, 300])
 
         vmin = np.min([np.min(kdata), np.min(edata)])
@@ -267,7 +262,7 @@ if __name__ == "__main__":
 
     #animate_function(solve_koopman_system(4))
 
-    plot_blocks(solve_koopman_system(phi_old, evK, psiKleft, psiKright, func_coeffs[4]))
+    plot_blocks(kdata_list[4])
 
     plt.show()
 

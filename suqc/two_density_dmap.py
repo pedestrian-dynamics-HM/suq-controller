@@ -18,8 +18,6 @@ spec = importlib.util.spec_from_file_location("VarBwDMAP", "/home/daniel/LRZ Syn
 foo = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(foo)
 
-
-
 # --------------------------------------------------
 # people who contributed code
 __authors__ = "Daniel Lehmberg"
@@ -34,7 +32,8 @@ class DMAPWrapper(object):
         self.epsilon = eps
 
         if mode == "fixed":
-            dmap = diffusion_maps.SparseDiffusionMaps(points=df.values, epsilon=eps, num_eigenpairs=num_eigenpairs, cut_off=np.inf)
+            dmap = diffusion_maps.SparseDiffusionMaps(points=df.values, epsilon=eps, num_eigenpairs=num_eigenpairs,
+                                                      cut_off=np.inf, normalize_kernel=False)
             self.eigenvalues, self.eigenvectors = dmap.eigenvalues, dmap.eigenvectors
         elif mode == "variable":
             dmap = foo.VarBwDMAP(data=df.values, eps=eps, d=3, beta=-0.5, k=df.values.shape[0])
@@ -128,30 +127,32 @@ if __name__ == "__main__":
     df = load_data(FILE_ACCUM)
     print(df)
 
-    ep = np.sqrt(np.median(squareform(pdist(df.values, metric="sqeuclidean"))))
+    compute_dmap = True
 
-    factors = [1, 0.7, 0.5, 0.4, 0.3]
-    factors = []
+    if compute_dmap:
+        dm = DMAPWrapper(df=df, eps=130, num_eigenpairs=200, mode="fixed")
+        dm.save_pickle()
+    else:
+        ep = np.sqrt(np.median(squareform(pdist(df.values, metric="sqeuclidean"))))
 
-    get_color(df, mode="traj")
+        factors = [1, 0.7, 0.5, 0.4, 0.3]
+        factors = []
 
-    #plot_single_trajectories(df, par_ids=[0, 10, 15, 24])
+        get_color(df, mode="traj")
 
-    for f in factors:
+        #plot_single_trajectories(df, par_ids=[0, 10, 15, 24])
 
-        ep_val = ep * f
+        for f in factors:
 
-        dmap = DMAPWrapper(df=df, eps=ep_val, num_eigenpairs=10, mode="fixed")
+            ep_val = ep * f
 
-        #plot_eigenvalues(dmap)
-        plot_eigenfunction_pairs(dmap, color=get_color(df, mode="traj"))
-        #plot3d_eigenfunctions(dmap, color=get_color(df, mode="traj"))
+            dmap = DMAPWrapper(df=df, eps=ep_val, num_eigenpairs=10, mode="fixed")
 
+            #plot_eigenvalues(dmap)
+            plot_eigenfunction_pairs(dmap, color=get_color(df, mode="traj"))
+            #plot3d_eigenfunctions(dmap, color=get_color(df, mode="traj"))
 
-    dm = DMAPWrapper(df=df, eps=0.5, num_eigenpairs=100, mode="fixed")
-    dm.save_pickle()
-
-    plt.show()
+        plt.show()
 
 
 

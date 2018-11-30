@@ -255,10 +255,21 @@ class Operator(object):
         # all points, the jacobian matrix is in each row and needs to be reshaped to be a matrix
         jac_matrix_full = np.zeros([nr_grad, nr_func**2])
 
+        nr_blocks = 50
+        blocksize = np.ceil(nr_grad / nr_blocks).astype(np.int)
+
         for i in range(nr_func):
-            print(f"func {i+1} of {nr_func}")
-            jac_matrix_full[:, i*nr_func:i*nr_func+nr_func] = \
-                self.interp_gradient_trajectories(idx=i, points=self._v_data.values)
+            print(f"func {i + 1} of {nr_func}")
+
+            for b in range(nr_blocks):
+
+                print(f"---block {str(b).zfill(2)} of {nr_blocks}")
+
+                start = b*blocksize
+                end = np.min([(b+1)*blocksize, jac_matrix_full.shape[0]])
+
+                jac_matrix_full[start:end, i*nr_func:i*nr_func+nr_func] = \
+                    self.interp_gradient_trajectories(idx=i, points=self._v_data.iloc[start:end, :].values)
 
         return jac_matrix_full, nr_func
 

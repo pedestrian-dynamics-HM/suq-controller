@@ -28,32 +28,35 @@ __credits__ = ["n/a"]
 
 class DMAPWrapper(object):
 
-    def __init__(self, df, eps, num_eigenpairs, mode):
+    def __init__(self, df, eps, num_eigenpairs, mode, **kwargs):
         self.epsilon = eps
 
         if mode == "fixed":
-            dmap = diffusion_maps.SparseDiffusionMaps(points=df.values, epsilon=eps, num_eigenpairs=num_eigenpairs,
-                                                      cut_off=np.inf, normalize_kernel=False)
-            self.eigenvalues, self.eigenvectors = dmap.eigenvalues, dmap.eigenvectors
+            self.dmap = diffusion_maps.SparseDiffusionMaps(points=df.values, epsilon=eps, num_eigenpairs=num_eigenpairs,
+                                                      cut_off=np.inf, **kwargs)
+            self.eigenvalues, self.eigenvectors = self.dmap.eigenvalues, self.dmap.eigenvectors.T
         elif mode == "variable":
-            dmap = foo.VarBwDMAP(data=df.values, eps=eps, d=3, beta=-0.5, k=df.values.shape[0])
-            self.eigenvalues, self.eigenvectors = dmap.dmap_eigenpairs(num_eigenpairs=num_eigenpairs)
+            self.dmap = foo.VarBwDMAP(data=df.values, eps=eps, d=3, beta=-0.5, k=df.values.shape[0])
+            self.eigenvalues, self.eigenvectors = self.dmap.dmap_eigenpairs(num_eigenpairs=num_eigenpairs)
             self.eigenvectors = self.eigenvectors.T
 
             self.eigenvalues = self.eigenvalues[::-1]
             self.eigenvectors = self.eigenvectors[::-1, :]
+
+        elif mode == "id":
+            self.eigenvectors = df.values  #
         else:
             raise ValueError
 
     @staticmethod
     def load_pickle():
-        with open("dmap_file.p", "rb") as f:
+        with open("dmap_file_BACKUP_best.p", "rb") as f:
             dmap = pickle.load(f)
         return dmap
 
 
     def save_pickle(self):
-        with open("dmap_file.p", "wb") as f:
+        with open("dmap_file_BACKUP_best.p", "wb") as f:
             pickle.dump(self, f)
 
 
@@ -122,15 +125,16 @@ def get_color(df, mode):
         raise ValueError
 
 
-
 if __name__ == "__main__":
     df = load_data(FILE_ACCUM)
     print(df)
 
+    # df = df.iloc[:, :3]  # test how much effect the conservation" parameter q3 has...
+
     compute_dmap = True
 
     if compute_dmap:
-        dm = DMAPWrapper(df=df, eps=130, num_eigenpairs=200, mode="fixed")
+        dm = DMAPWrapper(df=df, eps=130, num_eigenpairs=100, mode="fixed", **{"normalize_kernel": False})
         dm.save_pickle()
     else:
         ep = np.sqrt(np.median(squareform(pdist(df.values, metric="sqeuclidean"))))

@@ -14,7 +14,7 @@ import diffusion_maps
 from suqc.two_density_data import load_data, FILE_ACCUM
 
 import importlib.util
-spec = importlib.util.spec_from_file_location("VarBwDMAP", "/home/daniel/LRZ Sync+Share/JHU_Work/variable_bandwidth_dmap/vbwdmap2.py")
+spec = importlib.util.spec_from_file_location("VarBwDMAP", "/home/daniel/LRZ Sync+Share/JHU_Work/variable_bandwidth_dmap/vbwdmap.py")
 foo = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(foo)
 
@@ -134,7 +134,7 @@ if __name__ == "__main__":
     compute_dmap = True
 
     if compute_dmap:
-        dm = DMAPWrapper(df=df, eps=130, num_eigenpairs=100, mode="fixed", **{"normalize_kernel": False})
+        dm = DMAPWrapper(df=df, eps=130, num_eigenpairs=200, mode="fixed", **{"normalize_kernel": False})
         dm.save_pickle()
     else:
         ep = np.sqrt(np.median(squareform(pdist(df.values, metric="sqeuclidean"))))

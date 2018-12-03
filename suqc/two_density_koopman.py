@@ -8,10 +8,10 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.colorbar
 
-import scipy.linalg as linalg
-
 from suqc.two_density_dmap import DMAPWrapper
 from suqc.two_density_data import load_data, FILE_ACCUM
+
+import multiprocessing
 
 # --------------------------------------------------
 # people who contributed code
@@ -69,20 +69,69 @@ class Operator(object):
     def _dmap_coordinates(self):
         return self._dmap.eigenvectors
 
+    def _func_coeff_lstsq(self, basis, values):
+        ck, res = np.linalg.lstsq(basis, values, rcond=1E-14)[:2]
+
+        return ck, res
+
+    def _func_coeff_nystroem(self, basis, values):
+        # TODO: there are two options: take K(x,y) = I or compute the kernel matrix
+        # kernel_matrix = np.eye(values.shape[0])
+
+        print("WARNING: Use with caution, this is still experimental, also check the TODOs")
+
+        import scipy.spatial
+
+        #self.nystroem_extension(points=self._v_data.iloc[:, :-1].values, values=self._v_data.iloc[:, 0].values)
+
+        kdtree = scipy.spatial.cKDTree(self._v_data.iloc[:, :-1].values)
+        dmaps_kdtree = self._dmap.dmap._kdtree
+
+        distance_matrix = kdtree.sparse_distance_matrix(dmaps_kdtree, np.inf, output_type='coo_matrix')
+
+        kernel_matrix = self._dmap.dmap.compute_kernel_matrix(distance_matrix)
+
+        new_basis = kernel_matrix @ basis  # TODO: would require to use this new_basis for back transformation
+
+        # compute coefficients:
+        coeff = values @ basis / self._dmap.eigenvalues
+
+        #import diffusion_maps
+        #diffusion_maps.GeometricHarmonicsInterpolator
+
+        res = np.linalg.norm(new_basis @ coeff - values)
+        print(f"residual norm (different to lstq probably so don't compare!) {res}")
+
+        return coeff, res
+
     def _compute_func_coeff(self):
         func_coeffs = []
 
-        self._set_bump()
+        idx = pd.IndexSlice
+        self._v_data.loc[:, idx["QoI_voronoiDensity_scalar", "bump"]] = self._set_bump()
 
         if self._mode == "fp":
-            self._set_density()
+            self._v_data[idx["QoI_voronoiDensity_scalar", "density"]] = self._set_density()
+
+        self._set_p1p2_index()
 
         phi_old, _ = self._compute_shift_matrices()
         df_basis = self.realdata_basis()
 
+        phi = self._dmap_coordinates()
+
+        MODE = 1
+
         for i in range(self._v_data.shape[1]):
-            ck, res = np.linalg.lstsq(phi_old, df_basis.iloc[:, i], rcond=1E-14)[:2]
-            print(f"Sums of residuals; squared Euclidean 2-norm least-square parameter {i}: {res}")
+
+            if MODE == 1:
+                ck, res = self._func_coeff_lstsq(basis=phi_old, values=df_basis.iloc[:, i])
+                print(f"Sums of residuals; squared Euclidean 2-norm least-square parameter {i}: {res}")
+            elif MODE == 2:
+                ck, res = self._func_coeff_nystroem(basis=phi, values=df.iloc[:, i])
+            else:
+                raise ValueError
+
             func_coeffs.append(ck)
 
         return func_coeffs
@@ -124,8 +173,13 @@ class Operator(object):
         from scipy.stats import multivariate_normal
         point = self._v_data.iloc[400 * 25, :]  # starting value of T1
         vals = multivariate_normal(point, 20).pdf(self._v_data.values) * 100000
+        return vals
+
+    def _set_p1p2_index(self):
         idx = pd.IndexSlice
-        self._v_data.loc[:, idx["QoI_voronoiDensity_scalar", "bump"]] = vals
+        index = self._v_data.index
+        self._v_data.loc[:, idx["QoI_voronoiDensity_scalar", "p1_time"]] = index.get_level_values(1)
+        self._v_data.loc[:, idx["QoI_voronoiDensity_scalar", "p2_traj"]] = index.get_level_values(0)
 
     def _set_density(self):
 
@@ -140,10 +194,9 @@ class Operator(object):
         density = np.zeros(self._v_data.shape[0])
         density[np.isin(time_idx, idx_dens)] = 1
 
-        idx = pd.IndexSlice
-        self._v_data[idx["QoI_voronoiDensity_scalar", "density"]] = density
+        return density
 
-    def solve_kooman_system(self):
+    def solve_koopman_system(self):
 
         func_coeffs = self._compute_func_coeff()
         phi_old, evK, psiKleft, psiKright = self._compute_eigdecomp_K(plot=False)
@@ -151,7 +204,7 @@ class Operator(object):
         nr_func = len(func_coeffs)
 
         NT = 300
-        res = list()
+        res = list()  # TODO: make dict to see which QoI is computed!
 
         for i in range(nr_func):
             cg0 = func_coeffs[i]
@@ -178,7 +231,7 @@ class Operator(object):
 
     def compute_relative_residual(self):
 
-        kdata_list = self.solve_kooman_system()
+        kdata_list = self.solve_koopman_system()
         df_basis = self.realdata_basis()
 
         res = 0
@@ -222,10 +275,13 @@ class Operator(object):
 
         return interp(points)
 
+    def interp_id_func(self, idx):
+        return self._setup_nystroem_interp(values=self._v_data.values[:, idx])
+
     def interp_basis(self):
         phi = self._dmap_coordinates()  # = basis functions (evaluated at known data)
         # interpolate the coordinates itself
-        interp_phi = self.nystroem_extension(self._v_data.values, values=phi)
+        interp_phi = self.nystroem_extension(points=self._v_data.values, values=phi)
 
         print(f"residual interp_basis with Nyström extension: {np.sqrt(np.mean((phi - interp_phi)**2))}")
 
@@ -239,14 +295,75 @@ class Operator(object):
 
     def interp_gradient_trajectories(self, idx, points):
 
-        phi = self._dmap_coordinates()  # = basis functions (evaluated at known data)
+        #phi = self._dmap_coordinates()  # = basis functions (evaluated at known data)
 
         # TODO: in Juans Code only one function can be set to get the gradient, the Jacobian is not possible (the entire mapping!)
         interp = self._setup_nystroem_interp(values=self._v_data.iloc[:, idx].values)
-
-        grad = interp.gradient(points)  # instead of points...
+        grad = interp.gradient(points)
 
         return grad
+
+    def get_values_for_time(self, t):
+        time_idx = self._v_data.index.get_level_values(1)
+        bool_idx = time_idx == t
+
+        if np.sum(bool_idx) <= 0:
+            raise ValueError
+
+        return self._v_data.loc[bool_idx, :]
+
+    def fd_func(self, interp, point, idx_dir):
+
+        h = 0.3  # TODO: at the moment all directions the same...
+
+        eval_points = np.tile(point, [2, 1])
+        eval_points[0, idx_dir] = eval_points[0, idx_dir]-h
+        eval_points[1, idx_dir] = eval_points[1, idx_dir]+h
+
+        eval_func = interp(eval_points)
+
+        return (eval_func[1] - eval_func[0]) / (2*h)
+
+    def fd_jacobi_det(self, points):
+
+        if points.ndim == 1:
+            points = points[np.newaxis, :]
+
+
+        dets = np.zeros(points.shape[0])
+
+        interp_funcs = [self.interp_id_func(j) for j in range(4)]
+
+        for p in range(points.shape[0]):
+            jacobi = np.zeros([4, 4])
+            for j in range(4):
+                grad = np.zeros(4)
+                for i in range(4):
+                    grad[i] = self.fd_func(interp_funcs[j], points[p, :], idx_dir=i)
+                jacobi[j, :] = grad
+            dets[p] = np.linalg.det(jacobi)
+        return dets
+
+    def _comp_blockjacobian_mp(self, kwargs):
+        """parallelized version of jacobian computation"""
+
+        i = kwargs["i"]
+        nr_blocks = kwargs["nr_blocks"]
+        blocksize = kwargs["blocksize"]
+        last_idx = kwargs["last_idx"]
+
+        for b in range(nr_blocks):
+            print(f"---block {str(b).zfill(2)} of {nr_blocks}")
+            start = b * blocksize
+            end = np.min([(b + 1) * blocksize, last_idx])
+            # TODO: for testing
+            return self.interp_gradient_trajectories(idx=i, points=self._v_data.iloc[start:end, :].values)
+
+    def test(self, arg):
+        import time
+        print("Hallo")
+        time.sleep(20)
+        return 2
 
     def interp_jacobian_basis(self):
 
@@ -258,18 +375,32 @@ class Operator(object):
         nr_blocks = 50
         blocksize = np.ceil(nr_grad / nr_blocks).astype(np.int)
 
-        for i in range(nr_func):
-            print(f"func {i + 1} of {nr_func}")
+        MODE = 1
 
-            for b in range(nr_blocks):
+        if MODE == 0:
+            # single process
+            for i in range(nr_func):
+                print(f"func {i + 1} of {nr_func}")
 
-                print(f"---block {str(b).zfill(2)} of {nr_blocks}")
+                for b in range(nr_blocks):
 
-                start = b*blocksize
-                end = np.min([(b+1)*blocksize, jac_matrix_full.shape[0]])
+                    print(f"---block {str(b).zfill(2)} of {nr_blocks}")
 
-                jac_matrix_full[start:end, i*nr_func:i*nr_func+nr_func] = \
-                    self.interp_gradient_trajectories(idx=i, points=self._v_data.iloc[start:end, :].values)
+                    start = b*blocksize
+                    end = np.min([(b+1)*blocksize, jac_matrix_full.shape[0]])
+
+                    jac_matrix_full[start:end, i*nr_func:i*nr_func+nr_func] = \
+                        self.interp_gradient_trajectories(idx=i, points=self._v_data.iloc[start:end, :].values)
+        elif MODE == 1:
+
+            pool = multiprocessing.Pool(processes=2)
+
+            inp = lambda i: {"i": i, "nr_blocks": nr_blocks, "blocksize": blocksize, "last_idx": jac_matrix_full.shape[0]}
+            inp_list = list(map(inp, np.arange(nr_blocks)))
+
+            self._comp_blockjacobian_mp(inp_list[0])
+
+            #results = pool.map(self.test, inp_list)
 
         return jac_matrix_full, nr_func
 
@@ -283,10 +414,106 @@ class Operator(object):
         dets = np.zeros(jac_matrix.shape[0])
 
         for i in range(jac_matrix.shape[0]):
-            dets[i] = np.linalg.det( jac_matrix[i, :].reshape([nr_func, nr_func]) )
+            sign, det_log = np.linalg.slogdet(jac_matrix[i, :].reshape([nr_func, nr_func]))
+            dets[i] = np.exp(det_log)  # always positive (--> absolute value), don't need to use the sign
 
         if plot:
             plt.figure(), plt.imshow(dets.reshape([50, 300]))
+
+    def imshow_jacobi_det(self, p1, p2):
+        p1dp1 = np.gradient(p1, axis=1)
+        p1dp2 = np.gradient(p1, axis=0)
+
+        p2dp1 = np.gradient(p2, axis=1)
+        p2dp2 = np.gradient(p2, axis=0)
+
+        det_mat = np.zeros_like(p1)
+
+        for i in range(p1.shape[0]):
+            for j in range(p1.shape[1]):
+                jac = np.array([ [[p1dp1[i, j], p1dp2[i, j]],
+                                  [p2dp1[i, j], p2dp2[i, j]]]
+                                 ])
+                det_mat[i, j] = np.linalg.det(jac)
+        return det_mat
+
+    def imshow_proj_jacdet(self, tsnap):
+        df_basis = self.realdata_basis()  # use only the basis...
+        df_basis = df_basis.reset_index()
+
+        p1t0 = df_basis.loc[:, "level_1"].values.reshape([50, 300])  # time step
+        p2t0 = df_basis.loc[:, "level_0"].values.reshape([50, 300])  # trajectory number
+
+        #jacobi_det = self.imshow_jacobi_det(p1t0, p2t0)
+
+        res = self.solve_koopman_system()
+
+        p1all, p2all = res[-2], res[-1]
+
+        plot_initial = True
+        if plot_initial:
+            fig = plt.figure()
+            ax = fig.add_subplot(221)
+            ax.set_title("exact p1 (time)")
+            ax.imshow(p1t0)
+            ax = fig.add_subplot(222)
+            ax.imshow(p2t0)
+            ax.set_title("exact p2 (traj)")
+
+            ax = fig.add_subplot(223)
+            ax.imshow(p1all[:, 0].reshape([50,300]))
+            ax.set_title("back and forth p1 @ t=1 (time)")
+
+            ax = fig.add_subplot(224)
+            ax.imshow(p2all[:, 0].reshape([50,300]))
+            ax.set_title("back and forth p2 @ t=1 (traj)")
+
+        p1tsnap = p1all[:, tsnap].reshape([50, 300])
+        p2tsnap = p2all[:, tsnap].reshape([50, 300])
+
+        fig = plt.figure()
+        ax = fig.add_subplot(211)
+        ax.imshow(p1tsnap)
+        ax.set_title(f"p1(time) @ time={tsnap}")
+
+        ax = fig.add_subplot(212)
+        ax.imshow(p2tsnap)
+        ax.set_title(f"p2(traj) @ time={tsnap}")
+
+
+        # density push forward
+
+        # ...at start (by definition)
+        rho0 = np.zeros([50, 300])
+        rho0[:, 0:5] = 1  # first column = 1
+
+        #idx_old, _ = self._compute_shift_indices()
+        #rho0 = self._set_bump()[idx_old].reshape([50, 300])
+
+        # ... at time t
+        jacobi_det_flowt = self.imshow_jacobi_det(p1tsnap, p2tsnap)
+        #jacobi_det_flowt = self.imshow_jacobi_det(p1t0, p2t0)
+
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        ax.set_title(f"absolute determinant values at t={tsnap}")
+        ish = ax.imshow(np.abs(jacobi_det_flowt), cmap="jet")
+        fig.colorbar(ish)
+
+        rhot = 1/np.abs(jacobi_det_flowt) * rho0
+        rhot[np.isnan(rhot)] = 0
+
+        fig = plt.figure()
+        ax = fig.add_subplot(211)
+        ax.imshow(rho0)
+        ax.set_title(f"rho @ t=1")
+
+        ax = fig.add_subplot(212)
+        ax.imshow(rhot)
+        ax.set_title(f"rho @ t={tsnap}")
+
+        print(jacobi_det_flowt)
+
 
 
     @staticmethod
@@ -403,12 +630,21 @@ if __name__ == "__main__":
         mode = "k"
         kpm = Operator(dmap=dmap, data=df, mode=mode)
 
-        #kpm.interp_gradient_trajectories(points=None)
-        kpm.interp_det_basis(plot=True)
+        kpm.imshow_proj_jacdet(5)
         plt.show()
         exit()
 
-        kdata_list = kpm.solve_kooman_system()
+
+        #kpm.interp_gradient_trajectories(points=None)
+        #kpm.interp_det_basis(plot=True)
+
+        #kpm.get_values_for_time(1)
+        #kpm.fd_jacobi_det(points=df.iloc[0, :].values)
+
+        #plt.show()
+        #exit()
+
+        kdata_list = kpm.solve_koopman_system()
         idx_old, _ = kpm._compute_shift_indices()
 
         df_basis = kpm.realdata_basis()

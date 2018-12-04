@@ -113,7 +113,9 @@ def update(t):
 
 import matplotlib.animation
 
-ani = matplotlib.animation.FuncAnimation(fig, update, frames=np.arange(np.max(corr_time)), repeat=True, interval=20)
+ani = matplotlib.animation.FuncAnimation(fig, update, frames=np.arange(np.max(corr_time)), repeat=True, interval=30)
+
+ani.save('manifold.mp4', writer="ffmpeg")
 
 plt.show()
 

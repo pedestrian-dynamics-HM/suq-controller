@@ -131,16 +131,15 @@ if __name__ == "__main__":
 
     # df = df.iloc[:, :3]  # test how much effect the conservation" parameter q3 has...
 
-    compute_dmap = True
+    compute_dmap = False
 
     if compute_dmap:
-        dm = DMAPWrapper(df=df, eps=130, num_eigenpairs=200, mode="fixed", **{"normalize_kernel": False})
+        dm = DMAPWrapper(df=df, eps=1.15, num_eigenpairs=100, mode="fixed", **{"normalize_kernel": True})
         dm.save_pickle()
     else:
         ep = np.sqrt(np.median(squareform(pdist(df.values, metric="sqeuclidean"))))
 
         factors = [1, 0.7, 0.5, 0.4, 0.3]
-        factors = []
 
         get_color(df, mode="traj")
 
@@ -154,7 +153,7 @@ if __name__ == "__main__":
 
             #plot_eigenvalues(dmap)
             plot_eigenfunction_pairs(dmap, color=get_color(df, mode="traj"))
-            #plot3d_eigenfunctions(dmap, color=get_color(df, mode="traj"))
+            plot3d_eigenfunctions(dmap, color=get_color(df, mode="traj"))
 
         plt.show()
 

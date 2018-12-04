@@ -110,10 +110,9 @@ class Operator(object):
         idx = pd.IndexSlice
         self._v_data.loc[:, idx["QoI_voronoiDensity_scalar", "bump"]] = self._set_bump()
 
-        if self._mode == "fp":
-            self._v_data[idx["QoI_voronoiDensity_scalar", "density"]] = self._set_density()
+        self._v_data[idx["QoI_voronoiDensity_scalar", "density"]] = self._set_density()
 
-        self._set_p1p2_index()
+        #self._set_p1p2_index()
 
         phi_old, _ = self._compute_shift_matrices()
         df_basis = self.realdata_basis()
@@ -500,7 +499,7 @@ class Operator(object):
         ish = ax.imshow(np.abs(jacobi_det_flowt), cmap="jet")
         fig.colorbar(ish)
 
-        rhot = 1/np.abs(jacobi_det_flowt) * rho0
+        rhot = 1/np.abs(jacobi_det_flowt) * rho0  # TODO replace denom with 1E-10 + |J|...
         rhot[np.isnan(rhot)] = 0
 
         fig = plt.figure()
@@ -514,7 +513,18 @@ class Operator(object):
 
         print(jacobi_det_flowt)
 
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
 
+        idx_old, _ = self._compute_shift_indices()
+        ax.imshow(self._dmap.eigenvectors[idx_old, 1].reshape([50, 300]))
+
+
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+
+        idx_old, _ = self._compute_shift_indices()
+        ax.scatter(self._dmap.eigenvectors[idx_old, 1], self._dmap.eigenvectors[idx_old, 4])
 
     @staticmethod
     def plot_res_eps_range(df, eps_range, num_eigenpars: int=100):
@@ -536,11 +546,12 @@ class Operator(object):
 
 def plot_blocks(df, m):
     fig = plt.figure()
-    fig.subplots_adjust(hspace=0.00)
+    fig.subplots_adjust(hspace=0.3)
 
     steps = 5
 
     t_factor = 299//4
+    t_factor = 15
     vmin, vmax = np.min(m[:, 0:t_factor*(steps-1)]), np.max(m[:, :t_factor*(steps-1)])
 
     for i in range(steps):
@@ -630,9 +641,9 @@ if __name__ == "__main__":
         mode = "k"
         kpm = Operator(dmap=dmap, data=df, mode=mode)
 
-        kpm.imshow_proj_jacdet(5)
-        plt.show()
-        exit()
+        #kpm.imshow_proj_jacdet(5)
+        #plt.show()
+        #exit()
 
 
         #kpm.interp_gradient_trajectories(points=None)
@@ -686,7 +697,7 @@ if __name__ == "__main__":
             f.colorbar(im)
 
             #animate_function(solve_koopman_system(4))
-        if mode == "fp":
-            plot_blocks(df=kpm.realdata_basis(), m=kdata_list[-2])
+        #if mode == "fp":
+        plot_blocks(df=kpm.realdata_basis(), m=kdata_list[-2])
         plt.show()
 

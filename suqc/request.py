@@ -4,8 +4,8 @@ import json
 import multiprocessing
 import os
 import shutil
+from typing import Union
 
-from suqc.configuration import SuqcConfig
 from suqc.environment import VadereConsoleWrapper
 from suqc.parameter.create import VadereScenarioCreation
 from suqc.parameter.postchanges import PostScenarioChangesBase
@@ -39,7 +39,9 @@ class Request(object):
     PARAMETER_ID = "id"
     RUN_ID = "run_id"
 
-    def __init__(self, request_item_list: List[RequestItem], model: Union[str, VadereConsoleWrapper],
+    def __init__(self,
+                 request_item_list: List[RequestItem],
+                 model: Union[str, VadereConsoleWrapper],
                  qoi: Union[QuantityOfInterest, None]):
 
         if len(request_item_list) == 0:
@@ -163,22 +165,29 @@ class VariationBase(Request, ServerRequest):
     def __init__(self,
                  env_man: EnvironmentManager,
                  parameter_variation: ParameterVariationBase,
-                 model: str,
+                 model: Union[str, VadereConsoleWrapper],
                  qoi: Union[str, List[str], QuantityOfInterest],
                  post_changes: PostScenarioChangesBase = None,
+                 cache_floorfield=False,
                  njobs: int = 1,
                  remove_output=False):
 
-        self.parameter_variation = parameter_variation
         self.env_man = env_man
-        self.post_changes = post_changes
+        self.parameter_variation = parameter_variation
         self.model = model
+        self.post_changes = post_changes
+        self.cache_floorfield = cache_floorfield
         self.remove_output = remove_output
+
+        # TODO: need to insert the (default) floorfield path into post_changes, so that the cache is used!
 
         if isinstance(qoi, (str, list)):
             self.qoi = QuantityOfInterest(basis_scenario=self.env_man.basis_scenario, requested_files=qoi)
         else:
             self.qoi = qoi
+
+        # TODO: the VadereScenarioCreation requires the hash to compare with the created files, if there is a mismatch
+        #  raise a warning or error (this would mean that more caches are created during the request phase)
 
         scenario_creation = VadereScenarioCreation(self.env_man, self.parameter_variation, self.post_changes)
         request_item_list = scenario_creation.generate_vadere_scenarios(njobs)
@@ -187,6 +196,10 @@ class VariationBase(Request, ServerRequest):
         ServerRequest.__init__(self)
         
     def run(self, njobs: int = 1):
+
+        if self.cache_floorfield:
+            self.model.run_floorfield_cache(self.env_man.path_basis_scenario, self.env_man.vadere_output_folder())
+
         qoi_result_df, meta_info = super(VariationBase, self).run(njobs)
 
         # add another level to distinguish the columns with the parameter lookup

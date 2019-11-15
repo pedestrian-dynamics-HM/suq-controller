@@ -63,7 +63,7 @@ class VadereScenarioCreation(object):
 
         new_scenario = self._create_new_vadere_scenario(self._basis_scenario, parameter_id, run_id, parameter_variation)
 
-        output_folder = self._env_man.get_variation_output_folder(parameter_id, run_id)
+        output_folder = self._env_man.single_run_output_folder(parameter_id, run_id)
         scenario_path = self._save_vadere_scenario(parameter_id, run_id, new_scenario)
 
         result_item = suqc.request.RequestItem(parameter_id=parameter_id,
@@ -101,7 +101,7 @@ class VadereScenarioCreation(object):
         self._adapt_nr_digits_env_man(nr_variations=self._parameter_variation.nr_parameter_variations(),
                                       nr_runs=self._parameter_variation.nr_scenario_runs())
 
-        target_path = self._env_man.get_env_outputfolder_path()
+        target_path = self._env_man.vadere_result_folder_path()
 
         # For security:
         remove_folder(target_path)

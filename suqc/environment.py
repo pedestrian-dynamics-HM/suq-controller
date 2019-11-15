@@ -39,22 +39,36 @@ class VadereConsoleWrapper(object):
     def __init__(self, model_path: str, loglvl="INFO"):
 
         self.jar_path = os.path.abspath(model_path)
-        assert os.path.exists(self.jar_path)
+        if not os.path.exists(self.jar_path):
+            raise ValueError(f"Path to jar file {self.jar_path} does not exist.")
 
-        self.loglvl = loglvl
+        if self.jar_path.endswith(".jar"):
+            raise ValueError(f"Path to file {self.jar_path} is not a jar file.")
 
-        assert self.loglvl in self.ALLOWED_LOGLVL, f"set loglvl={self.loglvl} not contained in allowed: " \
-            f"{self.ALLOWED_LOGLVL}"
+        self.loglvl = loglvl.upper()
+
+        if self.loglvl not in self.ALLOWED_LOGLVL:
+            raise ValueError(f"parameter 'loglvl={self.loglvl}' not contained in allowed: \n{self.ALLOWED_LOGLVL}")
 
         if not os.path.exists(self.jar_path):
             raise FileExistsError(f"Vadere console file {self.jar_path} does not exist.")
 
-    def run_simulation(self, scenario_fp, output_path):
+    def run_simulation(self, scenario_filepath, output_path):
         start = time.time()
-        return_code = subprocess.call(["java", "-jar",
-                                       self.jar_path, "--loglevel",
-                                       self.loglvl, "suq", "-f", scenario_fp,
-                                       "-o", output_path])
+        return_code = subprocess.call(["java",
+                                       "-jar", self.jar_path,
+                                       "--loglevel", self.loglvl,
+                                       "suq", "-f", scenario_filepath, "-o", output_path])
+        return return_code, time.time() - start
+
+    def run_floorfield_cache(self, scenario_filepath, output_path):
+        start = time.time()
+        return_code = subprocess.call(["java",
+                                       "-jar", self.jar_path,
+                                       "--loglevel", self.loglvl,
+                                       "-f", scenario_filepath,
+                                       "-o", output_path,
+                                       "-m", "binCache"])
         return return_code, time.time() - start
 
     @classmethod
@@ -93,7 +107,7 @@ class EnvironmentManager(object):
         self.base_path, self.env_name = self.handle_path_and_env_input(base_path, env_name)
 
         self.env_name = env_name
-        self.env_path = self.output_folder_path(self.base_path, self.env_name)
+        self.env_path = self.environment_folder_path(self.base_path, self.env_name)
 
         # output is usually of the following format:
         # 000001_000002 for variation 1 and run_id 2
@@ -138,7 +152,7 @@ class EnvironmentManager(object):
     @classmethod
     @DeprecationWarning
     def create_variation_if_not_exist(cls, basis_scenario: Union[str, dict], base_path=None, env_name=None):
-        target_path = cls.output_folder_path(base_path, env_name)
+        target_path = cls.environment_folder_path(base_path, env_name)
         if os.path.exists(target_path):
             existing = cls(base_path, env_name)
 
@@ -151,9 +165,9 @@ class EnvironmentManager(object):
     @classmethod
     def create_new_environment(cls, base_path=None, env_name=None, handle_existing="ask_user_replace"):
 
-        output_folder_path = cls.output_folder_path(base_path, env_name)
+        output_folder_path = cls.environment_folder_path(base_path, env_name)
 
-        # TODO: Refactor, make handle_existing an Enum
+        # TODO: Refactor, make 'handle_existing' an Enum
         assert handle_existing in ["ask_user_replace", "force_replace", "write_in_if_exist_else_create", "write_in"]
 
         abort = False
@@ -183,7 +197,6 @@ class EnvironmentManager(object):
             env_man = cls(base_path=base_path, env_name=env_name)
 
         return env_man
-
 
     @classmethod
     def create_variation_env(cls, basis_scenario: Union[str, dict], base_path=None, env_name=None,
@@ -229,7 +242,7 @@ class EnvironmentManager(object):
 
     @classmethod
     def remove_environment(cls, base_path, name, force=False):
-        target_path = cls.output_folder_path(base_path, name)
+        target_path = cls.environment_folder_path(base_path, name)
 
         if force or user_query_yes_no(question=f"Are you sure you want to remove the current environment? Path: \n "
         f"{target_path}"):
@@ -251,20 +264,20 @@ class EnvironmentManager(object):
         return base_path, env_name
 
     @staticmethod
-    def output_folder_path(base_path, env_name):
+    def environment_folder_path(base_path, env_name):
         base_path, env_name = EnvironmentManager.handle_path_and_env_input(base_path, env_name)
         assert os.path.isdir(base_path)
         output_folder_path = os.path.join(base_path, env_name)
         return output_folder_path
 
-    def get_env_outputfolder_path(self):
+    def vadere_result_folder_path(self):
         rel_path = os.path.join(self.env_path, EnvironmentManager.vadere_output_folder)
         return os.path.abspath(rel_path)
 
-    def get_variation_output_folder(self, parameter_id, run_id):
+    def single_run_output_folder(self, parameter_id, run_id):
         scenario_filename = self._scenario_variation_filename(parameter_id=parameter_id, run_id=run_id)
         scenario_filename = scenario_filename.replace(".scenario", "")
-        return os.path.join(self.get_env_outputfolder_path(), "".join([scenario_filename, "_output"]))
+        return os.path.join(self.vadere_result_folder_path(), "".join([scenario_filename, "_output"]))
 
     def _scenario_variation_filename(self, parameter_id, run_id):
         digits_parameter_id = str(parameter_id).zfill(self.nr_digits_variation)
@@ -274,7 +287,7 @@ class EnvironmentManager(object):
         return "".join([numbered_scenario_name, ".scenario"])
 
     def scenario_variation_path(self, par_id, run_id):
-        return os.path.join(self.get_env_outputfolder_path(), self._scenario_variation_filename(par_id, run_id))
+        return os.path.join(self.vadere_result_folder_path(), self._scenario_variation_filename(par_id, run_id))
 
     def save_scenario_variation(self, par_id, run_id, content):
         scenario_path = self.scenario_variation_path(par_id, run_id)

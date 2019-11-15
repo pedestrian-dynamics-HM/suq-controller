@@ -33,9 +33,6 @@ class RequestItem(object):
         self.required_time = required_time
         self.return_code = return_code
 
-    def add_run_info(self):
-        pass
-
 
 class Request(object):
 
@@ -98,7 +95,7 @@ class Request(object):
         filenames = None
         for ires in qoi_results:
             if ires is not None:
-                # it is assumed that the the keys for all elements in results are the same!
+                # it is assumed that the keys for all elements in results are the same!
                 # TODO: this assumption may fail... possibly better to check for this!
                 filenames = list(ires.keys())
                 break

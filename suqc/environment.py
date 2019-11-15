@@ -42,7 +42,7 @@ class VadereConsoleWrapper(object):
         if not os.path.exists(self.jar_path):
             raise ValueError(f"Path to jar file {self.jar_path} does not exist.")
 
-        if self.jar_path.endswith(".jar"):
+        if not self.jar_path.endswith(".jar"):
             raise ValueError(f"Path to file {self.jar_path} is not a jar file.")
 
         self.loglvl = loglvl.upper()

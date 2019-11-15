@@ -258,7 +258,6 @@ class ServerRequest(object):
                           local_pickle_content,
                           local_transfer_files,
                           local_model_obj,
-                          class_name,
                           transfer_output):
 
         self._default_remote_environment_setter()
@@ -286,6 +285,7 @@ class ServerRequest(object):
 
             self._transfer_pickle_local2remote(local_pickle_content)
 
+            class_name = type(self).__name__
             s = f"""python3 -c 'import suqc; suqc.{class_name}._remote_run("{remote_pickle_arg_path}")'"""
             self.server.connection.run(s)
 

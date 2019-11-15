@@ -237,7 +237,6 @@ class VariationBase(Request, ServerRequest):
                                                                      local_pickle_content=pickle_content,
                                                                      local_transfer_files=local_transfer_files,
                                                                      local_model_obj=self.model,
-                                                                     class_name="VariationBase",
                                                                      transfer_output=not self.remove_output)
         return remote_result
 
@@ -389,7 +388,6 @@ class FolderExistScenarios(Request, ServerRequest):
                                local_pickle_content=local_pickle_content,
                                local_transfer_files=local_transfer_files,
                                local_model_obj=self.model,
-                               class_name="FolderExistScenarios",
                                transfer_output=True)
 
     def run(self, njobs: int = 1):
@@ -495,7 +493,6 @@ class SingleExistScenario(Request, ServerRequest):
                                local_pickle_content=local_pickle_content,
                                local_transfer_files=local_transfer_files,
                                local_model_obj=self.model,
-                               class_name="SingleExistScenario",
                                transfer_output=True)
 
 

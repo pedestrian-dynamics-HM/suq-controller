@@ -81,6 +81,10 @@ class Request(object):
         request_item.add_qoi_result(result)
         request_item.add_meta_info(required_time=required_time, return_code=return_code)
 
+        # Remove scenario, because it is copied to the output by Vadere (this reduces the space,
+        # if there are *many* parameter variations and scenario runs!)
+        os.remove(request_item.scenario_path)
+
         # Because of the multi-processor part, don't try to already add the results here to _results_df
         return request_item
 

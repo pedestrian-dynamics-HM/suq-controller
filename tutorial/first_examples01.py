@@ -9,7 +9,7 @@ from tutorial.imports import *
 sys.path.append(os.path.abspath("."))   # in case tutorial is called from the root directory
 sys.path.append(os.path.abspath(".."))  # in tutorial directly
 
-run_local = False
+run_local = True
 
 ###############################################################################################################
 # Usecase: One parameter in the scenario is changed, for every independent the data is collected and returned.

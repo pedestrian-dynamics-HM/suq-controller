@@ -78,8 +78,8 @@ class ServerConnection(object):
                   f"(local) numpy=={np.__version__} vs. (remote) numpy=={numpy_version} \n"
                   f"(local) pandas={pd.__version__} vs. (remote) numpy=={pandas_version}")
 
-        print(f"INFO: Connection established. Detected suqc=={suqc_version} on server. With dependency "
-              f"numpy=={numpy_version}, pandas={pandas_version} "
+        print(f"INFO: Connection established. Detected suqc=={suqc_version} on server. With (important) dependencies "
+              f"numpy=={numpy_version}, pandas=={pandas_version} "
               f"({server_cfg['host']}:{server_cfg['port']}) side.")
 
     def read_terminal_stdout(self, s: str) -> str:

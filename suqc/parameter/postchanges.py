@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import abc
-
 import numpy as np
 
 from suqc.utils.dict_utils import change_dict
@@ -11,7 +10,7 @@ class PostScenarioChangesBase(object):
 
     def __init__(self, apply_default=False):
 
-        self._apply_scenario_changes = {}
+        self.scenario_changes = {}
 
         if apply_default:
             self._defaults()
@@ -25,13 +24,13 @@ class PostScenarioChangesBase(object):
     def add_scenario_change(self, sc: 'PostScenarioChange'):
         # ABCScenarioChange in '' to support forward reference,
         # see https://www.python.org/dev/peps/pep-0484/#forward-references
-        if sc.name in self._apply_scenario_changes.keys():
+        if sc.name in self.scenario_changes.keys():
             raise KeyError(f"Scenario change with {sc.name} is already present.")
-        self._apply_scenario_changes[sc.name] = sc
+        self.scenario_changes[sc.name] = sc
 
     def _collect_changes(self, scenario, parameter_id, run_id, parameter_variation):
         changes = {}
-        for chn in self._apply_scenario_changes.values():
+        for chn in self.scenario_changes.values():
             changes.update(chn.get_changes_dict(scenario=scenario,
                                                 parameter_id=parameter_id,
                                                 run_id=run_id,
@@ -52,7 +51,19 @@ class PostScenarioChange(metaclass=abc.ABCMeta):
         raise NotImplementedError("ABC method")
 
 
+class SetFloorfieldCache(PostScenarioChange):
+
+    def __init__(self, cache_path="", cache_type="BIN_CACHE"):
+        self.cache_path = cache_path
+        self.cache_type = cache_type
+        super(SetFloorfieldCache, self).__init__(name="set_relative_cache_path")
+
+    def get_changes_dict(self, scenario, parameter_id, run_id, parameter_variation):
+        return {"cacheType": self.cache_type, "cacheDir": self.cache_path}
+
+
 class AlwaysEnableMetaData(PostScenarioChange):
+
     def __init__(self):
         super(AlwaysEnableMetaData, self).__init__(name="always_enable_meta_data")
 

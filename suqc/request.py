@@ -4,14 +4,13 @@ import json
 import multiprocessing
 import os
 import shutil
-from typing import Union
 
 from suqc.environment import VadereConsoleWrapper
 from suqc.parameter.create import VadereScenarioCreation
 from suqc.parameter.postchanges import PostScenarioChangesBase
 from suqc.parameter.sampling import *
 from suqc.qoi import QuantityOfInterest
-from suqc.remote import ServerConnection, ServerRequest
+from suqc.remote import ServerRequest
 from suqc.utils.general import create_folder, njobs_check_and_set, parent_folder_clean
 
 
@@ -64,7 +63,7 @@ class Request(object):
             print(f"WARNING: Simulation with parameter setting {par_id} failed.")
             return False
 
-    def _single_request(self, request_item: RequestItem) -> Tuple[dict, np.float64]:
+    def _single_request(self, request_item: RequestItem) -> RequestItem:
 
         self._create_output_path(request_item.output_path)
 
@@ -83,9 +82,10 @@ class Request(object):
         request_item.add_qoi_result(result)
         request_item.add_meta_info(required_time=required_time, return_code=return_code)
 
+        # TODO: leave scenario that they still work with the __cache__, but maybe there is a better idea?
         # Remove scenario, because it is copied to the output by Vadere (this reduces the space,
         # if there are *many* parameter variations and scenario runs!)
-        os.remove(request_item.scenario_path)
+        # os.remove(request_item.scenario_path)
 
         # Because of the multi-processor part, don't try to already add the results here to _results_df
         return request_item
@@ -127,7 +127,9 @@ class Request(object):
         return final_results
 
     def _compile_run_info(self):
-        data = [(item_.parameter_id, item_.run_id, item_.required_time, item_.return_code) for item_ in self.request_item_list]
+        data = [(item_.parameter_id, item_.run_id, item_.required_time, item_.return_code)
+                for item_ in self.request_item_list]
+
         df = pd.DataFrame(data, columns=[self.PARAMETER_ID, self.RUN_ID, "required_wallclock_time", "return_code"])
         df.set_index(keys=[self.PARAMETER_ID, self.RUN_ID], inplace=True)
         return df
@@ -179,15 +181,10 @@ class VariationBase(Request, ServerRequest):
         self.cache_floorfield = cache_floorfield
         self.remove_output = remove_output
 
-        # TODO: need to insert the (default) floorfield path into post_changes, so that the cache is used!
-
         if isinstance(qoi, (str, list)):
             self.qoi = QuantityOfInterest(basis_scenario=self.env_man.basis_scenario, requested_files=qoi)
         else:
             self.qoi = qoi
-
-        # TODO: the VadereScenarioCreation requires the hash to compare with the created files, if there is a mismatch
-        #  raise a warning or error (this would mean that more caches are created during the request phase)
 
         scenario_creation = VadereScenarioCreation(self.env_man, self.parameter_variation, self.post_changes)
         request_item_list = scenario_creation.generate_vadere_scenarios(njobs)
@@ -198,7 +195,10 @@ class VariationBase(Request, ServerRequest):
     def run(self, njobs: int = 1):
 
         if self.cache_floorfield:
-            self.model.run_floorfield_cache(self.env_man.path_basis_scenario, self.env_man.vadere_output_folder())
+            # TODO: the vadere_cache_path is hard coded, there is not guarantee, that in the scenario files the path
+            #  matches this path! It is very dangerous to have a path mismatch and turned on caching as
+            #  File writing/reading is not thread safe!
+            self.model.run_floorfield_cache(self.env_man.path_basis_scenario, self.env_man.vadere_cache_path())
 
         qoi_result_df, meta_info = super(VariationBase, self).run(njobs)
 
@@ -219,6 +219,7 @@ class VariationBase(Request, ServerRequest):
                     model=kwargs["model"],
                     qoi=kwargs["qoi"],
                     post_changes=kwargs["post_changes"],
+                    cache_floorfield=kwargs["cache_floorfield"],
                     njobs=kwargs["njobs"],
                     remove_output=False)  # the output for remote will be removed after all is transferred
 
@@ -229,6 +230,7 @@ class VariationBase(Request, ServerRequest):
         pickle_content = {"qoi": self.qoi,
                           "parameter_variation": self.parameter_variation,
                           "post_changes": self.post_changes,
+                          "cache_floorfield": self.cache_floorfield,
                           "njobs": njobs}
 
         local_transfer_files = {"path_basis_scenario": self.env_man.path_basis_scenario}
@@ -292,8 +294,12 @@ class DictVariation(VariationBase, ServerRequest):
         parameter_variation = UserDefinedSampling(parameter_dict_list)
         parameter_variation = parameter_variation.multiply_scenario_runs(scenario_runs=scenario_runs)
 
-        super(DictVariation, self).__init__(env_man=env, parameter_variation=parameter_variation, model=model, qoi=qoi,
-                                            post_changes=post_changes, njobs=njobs_create_scenarios)
+        super(DictVariation, self).__init__(env_man=env,
+                                            parameter_variation=parameter_variation,
+                                            model=model,
+                                            qoi=qoi,
+                                            post_changes=post_changes,
+                                            njobs=njobs_create_scenarios)
 
     def _remove_output(self):
         if self.env_path is not None:

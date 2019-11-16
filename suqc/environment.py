@@ -64,11 +64,15 @@ class VadereConsoleWrapper(object):
     def run_floorfield_cache(self, scenario_filepath, output_path):
         start = time.time()
         return_code = subprocess.call(["java",
-                                       "-jar", self.jar_path,
-                                       "--loglevel", self.loglvl,
-                                       "-f", scenario_filepath,
-                                       "-o", output_path,
-                                       "-m", "binCache"])
+                                       "-jar", self.jar_path, "--loglevel", self.loglvl,
+                                       "utils", "-i", scenario_filepath, "-o", output_path, "-m", "binCache"])
+        return return_code, time.time() - start
+
+    def run_cache_hash(self, scenario_filepath):
+        start = time.time()
+        return_code = subprocess.call(["java",
+                                       "-jar", self.jar_path, "--loglevel", self.loglvl,
+                                       "utils", "-i", scenario_filepath, "-m", "getHash"])
         return return_code, time.time() - start
 
     @classmethod
@@ -101,6 +105,7 @@ class VadereConsoleWrapper(object):
 class EnvironmentManager(object):
 
     vadere_output_folder = "vadere_output"
+    vadere_cache_path = os.path.join(vadere_output_folder, "__cache__")
 
     def __init__(self, base_path, env_name: str):
 
@@ -110,7 +115,7 @@ class EnvironmentManager(object):
         self.env_path = self.environment_folder_path(self.base_path, self.env_name)
 
         # output is usually of the following format:
-        # 000001_000002 for variation 1 and run_id 2
+        # 000001_000002 for variation 1 and run_id 2 (default 6 digits)
         # change these variables externally, if less digits are required to have shorter paths
         self.nr_digits_variation = 6
         self.nr_digits_runs = 6

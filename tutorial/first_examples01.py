@@ -30,6 +30,7 @@ if __name__ == "__main__":  # main required by Windows to run in parallel
                                post_changes=PostScenarioChangesBase(apply_default=True),
                                output_path=os.path.abspath("."),  # specify the path, where the results are written
                                output_folder="testfolder",  # specify the folder in the 'output_path'
+                               cache_floorfield=True,
                                remove_output=False  # flag whether to remove the output_folder or not
                                )
 

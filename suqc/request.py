@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-import json
 import multiprocessing
 import os
 import shutil
@@ -195,10 +194,8 @@ class VariationBase(Request, ServerRequest):
     def run(self, njobs: int = 1):
 
         if self.cache_floorfield:
-            # TODO: the vadere_cache_path is hard coded, there is not guarantee, that in the scenario files the path
-            #  matches this path! It is very dangerous to have a path mismatch and turned on caching as
-            #  File writing/reading is not thread safe!
-            self.model.run_floorfield_cache(self.env_man.path_basis_scenario, self.env_man.vadere_cache_path())
+            cache_folderpath = os.path.join(self.env_man.env_path, self.env_man.vadere_cache_path)
+            self.model.run_floorfield_cache(self.env_man.path_basis_scenario, cache_folderpath)
 
         qoi_result_df, meta_info = super(VariationBase, self).run(njobs)
 
@@ -271,6 +268,7 @@ class DictVariation(VariationBase, ServerRequest):
                  njobs_create_scenarios=1,
                  output_path=None,
                  output_folder=None,
+                 cache_floorfield=False,
                  remove_output=False,
                  env_remote=None):
 
@@ -284,6 +282,7 @@ class DictVariation(VariationBase, ServerRequest):
             env = EnvironmentManager.create_variation_env(basis_scenario=self.scenario_path,
                                                           base_path=output_path,
                                                           env_name=output_folder,
+                                                          cache_floorfield_folder=cache_floorfield,
                                                           handle_existing="ask_user_replace")
             self.env_path = env.env_path
         else:
@@ -299,6 +298,7 @@ class DictVariation(VariationBase, ServerRequest):
                                             model=model,
                                             qoi=qoi,
                                             post_changes=post_changes,
+                                            cache_floorfield=cache_floorfield,
                                             njobs=njobs_create_scenarios)
 
     def _remove_output(self):
@@ -324,6 +324,7 @@ class SingleKeyVariation(DictVariation, ServerRequest):
                  post_changes=PostScenarioChangesBase(apply_default=True),
                  output_path=None,
                  output_folder=None,
+                 cache_floorfield=False,
                  remove_output=False,
                  env_remote=None):
 
@@ -340,6 +341,7 @@ class SingleKeyVariation(DictVariation, ServerRequest):
                                                  output_folder=output_folder,
                                                  output_path=output_path,
                                                  remove_output=remove_output,
+                                                 cache_floorfield=cache_floorfield,
                                                  env_remote=env_remote)
 
 
@@ -351,7 +353,8 @@ class FolderExistScenarios(Request, ServerRequest):
         assert os.path.exists(path_scenario_folder)
         self.path_scenario_folder = path_scenario_folder
 
-        self.env_man = EnvironmentManager.create_new_environment(base_path=output_path, env_name=output_folder,
+        self.env_man = EnvironmentManager.create_new_environment(base_path=output_path,
+                                                                 env_name=output_folder,
                                                                  handle_existing=handle_existing)
 
         request_item_list = list()

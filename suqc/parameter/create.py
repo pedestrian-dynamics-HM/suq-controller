@@ -103,9 +103,9 @@ class VadereScenarioCreation(object):
 
         target_path = self._env_man.vadere_result_folder_path()
 
-        # For security:
-        remove_folder(target_path)
-        create_folder(target_path)
+        # For security:  TODO: remove?
+        # remove_folder(target_path)
+        # create_folder(target_path)
 
         if njobs == 1:
             request_item_list = self._sp_creation()

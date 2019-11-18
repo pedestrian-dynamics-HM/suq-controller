@@ -168,7 +168,8 @@ class EnvironmentManager(object):
             return cls.create_variation_env(basis_scenario=basis_scenario, base_path=base_path, env_name=env_name)
 
     @classmethod
-    def create_new_environment(cls, base_path=None, env_name=None, handle_existing="ask_user_replace"):
+    def create_new_environment(cls, base_path=None, env_name=None, cache_floorfield=False,
+                               handle_existing="ask_user_replace"):
 
         output_folder_path = cls.environment_folder_path(base_path, env_name)
 
@@ -205,7 +206,7 @@ class EnvironmentManager(object):
 
     @classmethod
     def create_variation_env(cls, basis_scenario: Union[str, dict], base_path=None, env_name=None,
-                             handle_existing="ask_user_replace"):
+                             cache_floorfield_folder=False, handle_existing="ask_user_replace"):
 
         # Check if environment already exists
         env_man = cls.create_new_environment(base_path=base_path, env_name=env_name, handle_existing=handle_existing)
@@ -242,6 +243,10 @@ class EnvironmentManager(object):
 
         # Create the folder where all output is stored
         os.mkdir(os.path.join(path_output_folder, EnvironmentManager.vadere_output_folder))
+
+        if cache_floorfield_folder:
+            cache_folder_path = os.path.join(path_output_folder, EnvironmentManager.vadere_cache_path)
+            os.mkdir(cache_folder_path)
 
         return cls(base_path, env_name)
 

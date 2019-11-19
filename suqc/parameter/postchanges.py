@@ -7,7 +7,6 @@ from suqc.utils.dict_utils import change_dict
 
 
 class PostScenarioChangesBase(object):
-
     def __init__(self, apply_default=False):
 
         self.scenario_changes = {}
@@ -21,7 +20,7 @@ class PostScenarioChangesBase(object):
         self.add_scenario_change(AlwaysEnableMetaData())
         self.add_scenario_change(ChangeDescription())
 
-    def add_scenario_change(self, sc: 'PostScenarioChange'):
+    def add_scenario_change(self, sc: "PostScenarioChange"):
         # ABCScenarioChange in '' to support forward reference,
         # see https://www.python.org/dev/peps/pep-0484/#forward-references
         if sc.name in self.scenario_changes.keys():
@@ -31,18 +30,26 @@ class PostScenarioChangesBase(object):
     def _collect_changes(self, scenario, parameter_id, run_id, parameter_variation):
         changes = {}
         for chn in self.scenario_changes.values():
-            changes.update(chn.get_changes_dict(scenario=scenario,
-                                                parameter_id=parameter_id,
-                                                run_id=run_id,
-                                                parameter_variation=parameter_variation))
+            changes.update(
+                chn.get_changes_dict(
+                    scenario=scenario,
+                    parameter_id=parameter_id,
+                    run_id=run_id,
+                    parameter_variation=parameter_variation,
+                )
+            )
         return changes
 
     def change_scenario(self, scenario, parameter_id, run_id, parameter_variation):
-        return change_dict(scenario, changes=self._collect_changes(scenario, parameter_id, run_id, parameter_variation))
+        return change_dict(
+            scenario,
+            changes=self._collect_changes(
+                scenario, parameter_id, run_id, parameter_variation
+            ),
+        )
 
 
 class PostScenarioChange(metaclass=abc.ABCMeta):
-
     def __init__(self, name):
         self.name = name
 
@@ -52,7 +59,6 @@ class PostScenarioChange(metaclass=abc.ABCMeta):
 
 
 class SetFloorfieldCache(PostScenarioChange):
-
     def __init__(self, cache_path="", cache_type="BIN_CACHE"):
         self.cache_path = cache_path
         self.cache_type = cache_type
@@ -63,7 +69,6 @@ class SetFloorfieldCache(PostScenarioChange):
 
 
 class AlwaysEnableMetaData(PostScenarioChange):
-
     def __init__(self):
         super(AlwaysEnableMetaData, self).__init__(name="always_enable_meta_data")
 
@@ -72,12 +77,15 @@ class AlwaysEnableMetaData(PostScenarioChange):
 
 
 class ChangeRealTimeSimTimeRatio(PostScenarioChange):
-
     def __init__(self):
-        super(ChangeRealTimeSimTimeRatio, self).__init__(name="real_time_sim_time_ratio")
+        super(ChangeRealTimeSimTimeRatio, self).__init__(
+            name="real_time_sim_time_ratio"
+        )
 
     def get_changes_dict(self, scenario, parameter_id, run_id, parameter_variation):
-        return {"realTimeSimTimeRatio": 0.0}  # Speeds up the non-visual computations in case a ratio was set!
+        return {
+            "realTimeSimTimeRatio": 0.0
+        }  # Speeds up the non-visual computations in case a ratio was set!
 
 
 class ChangeRandomNumber(PostScenarioChange):
@@ -86,7 +94,9 @@ class ChangeRandomNumber(PostScenarioChange):
     KEY_SIM_SEED = "simulationSeed"
 
     def __init__(self, fixed=False, randint=False, par_and_run_id=False):
-        assert fixed + randint + par_and_run_id == 1, "Exactly one parameter has to be set to true"
+        assert (
+            fixed + randint + par_and_run_id == 1
+        ), "Exactly one parameter has to be set to true"
         self._isfixed = fixed
         self._fixed_randnr = None
 
@@ -102,17 +112,21 @@ class ChangeRandomNumber(PostScenarioChange):
     def get_changes_dict(self, scenario, parameter_id, run_id, parameter_variation):
 
         if self._isfixed:
-            assert self._fixed_randnr is not None, "Fixed random number has to be set with method set_fixed_random_nr"
+            assert (
+                self._fixed_randnr is not None
+            ), "Fixed random number has to be set with method set_fixed_random_nr"
             rnr = self._fixed_randnr
         elif self._israndint:
             # 4294967295 = max unsigned 32 bit integer
             rnr = np.random.randint(0, 4294967295)
         else:  # --> self._isparid
-            rnr = (parameter_id * 1E6 + run_id)  # the 1E6 is required to not have
+            rnr = parameter_id * 1e6 + run_id  # the 1E6 is required to not have
 
-        return {ChangeRandomNumber.KEY_FIXED: True,
-                ChangeRandomNumber.KEY_SEED: rnr,
-                ChangeRandomNumber.KEY_SIM_SEED: rnr}
+        return {
+            ChangeRandomNumber.KEY_FIXED: True,
+            ChangeRandomNumber.KEY_SEED: rnr,
+            ChangeRandomNumber.KEY_SIM_SEED: rnr,
+        }
 
 
 class ChangeScenarioName(PostScenarioChange):
@@ -134,8 +148,13 @@ class ChangeDescription(PostScenarioChange):
 
     def __init__(self):
         super(ChangeDescription, self).__init__(name="description")
-    
+
     def get_changes_dict(self, scenario, parameter_id, run_id, parameter_variation):
-        changes_in_description = " ".join(["applied parameter variation=", str(parameter_variation)])
-        return {ChangeDescription.KEY_DESCRIPTION: "--".join([f"par_id={parameter_id} and run_id={run_id}",
-                                                              changes_in_description])}
+        changes_in_description = " ".join(
+            ["applied parameter variation=", str(parameter_variation)]
+        )
+        return {
+            ChangeDescription.KEY_DESCRIPTION: "--".join(
+                [f"par_id={parameter_id} and run_id={run_id}", changes_in_description]
+            )
+        }

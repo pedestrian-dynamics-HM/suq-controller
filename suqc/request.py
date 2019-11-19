@@ -14,7 +14,6 @@ from suqc.utils.general import create_folder, njobs_check_and_set, parent_folder
 
 
 class RequestItem(object):
-
     def __init__(self, parameter_id, run_id, scenario_path, base_path, output_folder):
         self.parameter_id = parameter_id
         self.run_id = run_id
@@ -37,10 +36,12 @@ class Request(object):
     PARAMETER_ID = "id"
     RUN_ID = "run_id"
 
-    def __init__(self,
-                 request_item_list: List[RequestItem],
-                 model: Union[str, VadereConsoleWrapper],
-                 qoi: Union[QuantityOfInterest, None]):
+    def __init__(
+        self,
+        request_item_list: List[RequestItem],
+        model: Union[str, VadereConsoleWrapper],
+        qoi: Union[QuantityOfInterest, None],
+    ):
 
         if len(request_item_list) == 0:
             raise ValueError("Request list has no entries.")
@@ -66,12 +67,19 @@ class Request(object):
 
         self._create_output_path(request_item.output_path)
 
-        return_code, required_time = self.model.run_simulation(request_item.scenario_path, request_item.output_path)
-        is_results = self._interpret_return_value(return_code, request_item.parameter_id)
+        return_code, required_time = self.model.run_simulation(
+            request_item.scenario_path, request_item.output_path
+        )
+        is_results = self._interpret_return_value(
+            return_code, request_item.parameter_id
+        )
 
         if is_results and self.qoi is not None:
-            result = self.qoi.read_and_extract_qois(par_id=request_item.parameter_id, run_id=request_item.run_id,
-                                                    output_path=request_item.output_path)
+            result = self.qoi.read_and_extract_qois(
+                par_id=request_item.parameter_id,
+                run_id=request_item.run_id,
+                output_path=request_item.output_path,
+            )
         else:
             result = None
 
@@ -114,7 +122,9 @@ class Request(object):
 
             for filename in filenames:
 
-                collected_df = [item_[filename] for item_ in qoi_results if item_ is not None]
+                collected_df = [
+                    item_[filename] for item_ in qoi_results if item_ is not None
+                ]
                 collected_df = pd.concat(collected_df, axis=0)
 
                 final_results[filename] = collected_df
@@ -126,10 +136,20 @@ class Request(object):
         return final_results
 
     def _compile_run_info(self):
-        data = [(item_.parameter_id, item_.run_id, item_.required_time, item_.return_code)
-                for item_ in self.request_item_list]
+        data = [
+            (item_.parameter_id, item_.run_id, item_.required_time, item_.return_code)
+            for item_ in self.request_item_list
+        ]
 
-        df = pd.DataFrame(data, columns=[self.PARAMETER_ID, self.RUN_ID, "required_wallclock_time", "return_code"])
+        df = pd.DataFrame(
+            data,
+            columns=[
+                self.PARAMETER_ID,
+                self.RUN_ID,
+                "required_wallclock_time",
+                "return_code",
+            ],
+        )
         df.set_index(keys=[self.PARAMETER_ID, self.RUN_ID], inplace=True)
         return df
 
@@ -162,16 +182,17 @@ class Request(object):
 
 
 class VariationBase(Request, ServerRequest):
-
-    def __init__(self,
-                 env_man: EnvironmentManager,
-                 parameter_variation: ParameterVariationBase,
-                 model: Union[str, VadereConsoleWrapper],
-                 qoi: Union[str, List[str], QuantityOfInterest],
-                 post_changes: PostScenarioChangesBase = None,
-                 cache_floorfield=False,
-                 njobs: int = 1,
-                 remove_output=False):
+    def __init__(
+        self,
+        env_man: EnvironmentManager,
+        parameter_variation: ParameterVariationBase,
+        model: Union[str, VadereConsoleWrapper],
+        qoi: Union[str, List[str], QuantityOfInterest],
+        post_changes: PostScenarioChangesBase = None,
+        cache_floorfield=False,
+        njobs: int = 1,
+        remove_output=False,
+    ):
 
         self.env_man = env_man
         self.parameter_variation = parameter_variation
@@ -181,26 +202,36 @@ class VariationBase(Request, ServerRequest):
         self.remove_output = remove_output
 
         if isinstance(qoi, (str, list)):
-            self.qoi = QuantityOfInterest(basis_scenario=self.env_man.basis_scenario, requested_files=qoi)
+            self.qoi = QuantityOfInterest(
+                basis_scenario=self.env_man.basis_scenario, requested_files=qoi
+            )
         else:
             self.qoi = qoi
 
-        scenario_creation = VadereScenarioCreation(self.env_man, self.parameter_variation, self.post_changes)
+        scenario_creation = VadereScenarioCreation(
+            self.env_man, self.parameter_variation, self.post_changes
+        )
         request_item_list = scenario_creation.generate_vadere_scenarios(njobs)
 
         super(VariationBase, self).__init__(request_item_list, self.model, self.qoi)
         ServerRequest.__init__(self)
-        
+
     def run(self, njobs: int = 1):
 
         if self.cache_floorfield:
-            cache_folderpath = os.path.join(self.env_man.env_path, self.env_man.vadere_cache_path)
-            self.model.run_floorfield_cache(self.env_man.path_basis_scenario, cache_folderpath)
+            cache_folderpath = os.path.join(
+                self.env_man.env_path, self.env_man.vadere_cache_path
+            )
+            self.model.run_floorfield_cache(
+                self.env_man.path_basis_scenario, cache_folderpath
+            )
 
         qoi_result_df, meta_info = super(VariationBase, self).run(njobs)
 
         # add another level to distinguish the columns with the parameter lookup
-        meta_info.columns = pd.MultiIndex.from_arrays([["MetaInfo"] * meta_info.shape[1], meta_info.columns])
+        meta_info.columns = pd.MultiIndex.from_arrays(
+            [["MetaInfo"] * meta_info.shape[1], meta_info.columns]
+        )
         lookup_df = pd.concat([self.parameter_variation.points, meta_info], axis=1)
 
         return lookup_df, qoi_result_df
@@ -211,79 +242,90 @@ class VariationBase(Request, ServerRequest):
         kwargs = cls.open_arg_pickle(remote_pickle_arg_path)
         env_man = EnvironmentManager(base_path=None, env_name=kwargs["remote_env_name"])
 
-        setup = cls(env_man=env_man,
-                    parameter_variation=kwargs["parameter_variation"],
-                    model=kwargs["model"],
-                    qoi=kwargs["qoi"],
-                    post_changes=kwargs["post_changes"],
-                    cache_floorfield=kwargs["cache_floorfield"],
-                    njobs=kwargs["njobs"],
-                    remove_output=False)  # the output for remote will be removed after all is transferred
+        setup = cls(
+            env_man=env_man,
+            parameter_variation=kwargs["parameter_variation"],
+            model=kwargs["model"],
+            qoi=kwargs["qoi"],
+            post_changes=kwargs["post_changes"],
+            cache_floorfield=kwargs["cache_floorfield"],
+            njobs=kwargs["njobs"],
+            remove_output=False,
+        )  # the output for remote will be removed after all is transferred
 
         res = setup.run(kwargs["njobs"])
         cls.dump_result_pickle(res, kwargs["remote_pickle_res_path"])
 
     def remote(self, njobs=1):
-        pickle_content = {"qoi": self.qoi,
-                          "parameter_variation": self.parameter_variation,
-                          "post_changes": self.post_changes,
-                          "cache_floorfield": self.cache_floorfield,
-                          "njobs": njobs}
+        pickle_content = {
+            "qoi": self.qoi,
+            "parameter_variation": self.parameter_variation,
+            "post_changes": self.post_changes,
+            "cache_floorfield": self.cache_floorfield,
+            "njobs": njobs,
+        }
 
         local_transfer_files = {"path_basis_scenario": self.env_man.path_basis_scenario}
 
-        remote_result = super(VariationBase, self)._remote_ssh_logic(local_env_man=self.env_man,
-                                                                     local_pickle_content=pickle_content,
-                                                                     local_transfer_files=local_transfer_files,
-                                                                     local_model_obj=self.model,
-                                                                     transfer_output=not self.remove_output)
+        remote_result = super(VariationBase, self)._remote_ssh_logic(
+            local_env_man=self.env_man,
+            local_pickle_content=pickle_content,
+            local_transfer_files=local_transfer_files,
+            local_model_obj=self.model,
+            transfer_output=not self.remove_output,
+        )
         return remote_result
 
 
 class SampleVariation(VariationBase, ServerRequest):
-
-    def __init__(self,
-                 scenario_path: str,
-                 parameter_sampling: ParameterVariationBase,
-                 qoi: Union[str, List[str]],
-                 model: Union[str, VadereConsoleWrapper],
-                 scenario_runs=1,
-                 output_path=None,
-                 output_folder=None,
-                 remove_output=False,
-                 env_remote=None):
+    def __init__(
+        self,
+        scenario_path: str,
+        parameter_sampling: ParameterVariationBase,
+        qoi: Union[str, List[str]],
+        model: Union[str, VadereConsoleWrapper],
+        scenario_runs=1,
+        output_path=None,
+        output_folder=None,
+        remove_output=False,
+        env_remote=None,
+    ):
         # TODO
         pass
 
 
 class DictVariation(VariationBase, ServerRequest):
-
-    def __init__(self,
-                 scenario_path: str,
-                 parameter_dict_list: List[dict],
-                 qoi: Union[str, List[str]],
-                 model: Union[str, VadereConsoleWrapper],
-                 scenario_runs=1,
-                 post_changes=PostScenarioChangesBase(apply_default=True),
-                 njobs_create_scenarios=1,
-                 output_path=None,
-                 output_folder=None,
-                 cache_floorfield=False,
-                 remove_output=False,
-                 env_remote=None):
+    def __init__(
+        self,
+        scenario_path: str,
+        parameter_dict_list: List[dict],
+        qoi: Union[str, List[str]],
+        model: Union[str, VadereConsoleWrapper],
+        scenario_runs=1,
+        post_changes=PostScenarioChangesBase(apply_default=True),
+        njobs_create_scenarios=1,
+        output_path=None,
+        output_folder=None,
+        cache_floorfield=False,
+        remove_output=False,
+        env_remote=None,
+    ):
 
         self.scenario_path = scenario_path
         self.remove_output = remove_output
 
-        assert os.path.exists(scenario_path) and scenario_path.endswith(".scenario"), \
-            "Filepath must exist and the file has to end with .scenario"
+        assert os.path.exists(scenario_path) and scenario_path.endswith(
+            ".scenario"
+        ), "Filepath must exist and the file has to end with .scenario"
 
         if env_remote is None:
-            env = EnvironmentManager.create_variation_env(basis_scenario=self.scenario_path,
-                                                          base_path=output_path,
-                                                          env_name=output_folder,
-                                                          cache_floorfield_folder=cache_floorfield,
-                                                          handle_existing="ask_user_replace")
+            env = EnvironmentManager.create_variation_env(
+                basis_scenario=self.scenario_path,
+                base_path=output_path,
+                env_name=output_folder,
+                cache_floorfield_folder=cache_floorfield,
+                handle_existing="ask_user_replace",
+            )
             self.env_path = env.env_path
         else:
             self.env_path = env_remote.env_path
@@ -291,15 +333,19 @@ class DictVariation(VariationBase, ServerRequest):
             env = env_remote
 
         parameter_variation = UserDefinedSampling(parameter_dict_list)
-        parameter_variation = parameter_variation.multiply_scenario_runs(scenario_runs=scenario_runs)
+        parameter_variation = parameter_variation.multiply_scenario_runs(
+            scenario_runs=scenario_runs
+        )
 
-        super(DictVariation, self).__init__(env_man=env,
-                                            parameter_variation=parameter_variation,
-                                            model=model,
-                                            qoi=qoi,
-                                            post_changes=post_changes,
-                                            cache_floorfield=cache_floorfield,
-                                            njobs=njobs_create_scenarios)
+        super(DictVariation, self).__init__(
+            env_man=env,
+            parameter_variation=parameter_variation,
+            model=model,
+            qoi=qoi,
+            post_changes=post_changes,
+            cache_floorfield=cache_floorfield,
+            njobs=njobs_create_scenarios,
+        )
 
     def _remove_output(self):
         if self.env_path is not None:
@@ -315,47 +361,59 @@ class DictVariation(VariationBase, ServerRequest):
 
 
 class SingleKeyVariation(DictVariation, ServerRequest):
-
-    def __init__(self, scenario_path: str,
-                 key: str, values: np.ndarray,
-                 qoi: Union[str, List[str]],
-                 model: str,
-                 scenario_runs=1,
-                 post_changes=PostScenarioChangesBase(apply_default=True),
-                 output_path=None,
-                 output_folder=None,
-                 cache_floorfield=False,
-                 remove_output=False,
-                 env_remote=None):
+    def __init__(
+        self,
+        scenario_path: str,
+        key: str,
+        values: np.ndarray,
+        qoi: Union[str, List[str]],
+        model: str,
+        scenario_runs=1,
+        post_changes=PostScenarioChangesBase(apply_default=True),
+        output_path=None,
+        output_folder=None,
+        cache_floorfield=False,
+        remove_output=False,
+        env_remote=None,
+    ):
 
         self.key = key
         self.values = values
 
         simple_grid = [{key: v} for v in values]
-        super(SingleKeyVariation, self).__init__(scenario_path=scenario_path,
-                                                 parameter_dict_list=simple_grid,
-                                                 qoi=qoi,
-                                                 model=model,
-                                                 scenario_runs=scenario_runs,
-                                                 post_changes=post_changes,
-                                                 output_folder=output_folder,
-                                                 output_path=output_path,
-                                                 remove_output=remove_output,
-                                                 cache_floorfield=cache_floorfield,
-                                                 env_remote=env_remote)
+        super(SingleKeyVariation, self).__init__(
+            scenario_path=scenario_path,
+            parameter_dict_list=simple_grid,
+            qoi=qoi,
+            model=model,
+            scenario_runs=scenario_runs,
+            post_changes=post_changes,
+            output_folder=output_folder,
+            output_path=output_path,
+            remove_output=remove_output,
+            cache_floorfield=cache_floorfield,
+            env_remote=env_remote,
+        )
 
 
 class FolderExistScenarios(Request, ServerRequest):
-
-    def __init__(self, path_scenario_folder, model, output_path=None, output_folder=None,
-                 handle_existing="ask_user_replace"):
+    def __init__(
+        self,
+        path_scenario_folder,
+        model,
+        output_path=None,
+        output_folder=None,
+        handle_existing="ask_user_replace",
+    ):
 
         assert os.path.exists(path_scenario_folder)
         self.path_scenario_folder = path_scenario_folder
 
-        self.env_man = EnvironmentManager.create_new_environment(base_path=output_path,
-                                                                 env_name=output_folder,
-                                                                 handle_existing=handle_existing)
+        self.env_man = EnvironmentManager.create_new_environment(
+            base_path=output_path,
+            env_name=output_folder,
+            handle_existing=handle_existing,
+        )
 
         request_item_list = list()
 
@@ -365,11 +423,13 @@ class FolderExistScenarios(Request, ServerRequest):
             if file_base_name.endswith(".scenario"):
                 scenario_name = file_base_name.replace(".scenario", "")
 
-                request_item = RequestItem(parameter_id=scenario_name,
-                                           run_id=0,
-                                           scenario_path=os.path.join(path_scenario_folder, filename),
-                                           base_path=self.env_man.env_path,
-                                           output_folder="_".join([scenario_name, "output"]))
+                request_item = RequestItem(
+                    parameter_id=scenario_name,
+                    run_id=0,
+                    scenario_path=os.path.join(path_scenario_folder, filename),
+                    base_path=self.env_man.env_path,
+                    output_folder="_".join([scenario_name, "output"]),
+                )
                 request_item_list.append(request_item)
 
         super(FolderExistScenarios, self).__init__(request_item_list, model, qoi=None)
@@ -380,8 +440,12 @@ class FolderExistScenarios(Request, ServerRequest):
 
         kwargs = cls.open_arg_pickle(remote_pickle_arg_path)
 
-        setup = cls(path_scenario_folder=kwargs["remote_folder_path"], model=kwargs["model"],
-                    output_folder=kwargs["remote_env_name"], handle_existing="write_in")
+        setup = cls(
+            path_scenario_folder=kwargs["remote_folder_path"],
+            model=kwargs["model"],
+            output_folder=kwargs["remote_env_name"],
+            handle_existing="write_in",
+        )
         res = setup.run(kwargs["njobs"])
         cls.dump_result_pickle(res, kwargs["remote_pickle_res_path"])
 
@@ -393,11 +457,13 @@ class FolderExistScenarios(Request, ServerRequest):
         for i, request in enumerate(self.request_item_list):
             local_transfer_files["scenario_path_{i}"] = request.scenario_path
 
-        self._remote_ssh_logic(local_env_man=self.env_man,
-                               local_pickle_content=local_pickle_content,
-                               local_transfer_files=local_transfer_files,
-                               local_model_obj=self.model,
-                               transfer_output=True)
+        self._remote_ssh_logic(
+            local_env_man=self.env_man,
+            local_pickle_content=local_pickle_content,
+            local_transfer_files=local_transfer_files,
+            local_model_obj=self.model,
+            transfer_output=True,
+        )
 
     def run(self, njobs: int = 1):
         _, meta_info = super(FolderExistScenarios, self).run(njobs)
@@ -405,51 +471,64 @@ class FolderExistScenarios(Request, ServerRequest):
 
 
 class ProjectOutput(FolderExistScenarios):
-
     def __init__(self, project_path, model):
 
         if not os.path.exists(project_path):
             raise ValueError(f"project_path {project_path} odes not exist.")
 
         if not os.path.isfile(project_path) or not project_path.endswith(".project"):
-            raise ValueError(f"project_path has to be the path to a Vadere project file (ending with .project).")
+            raise ValueError(
+                f"project_path has to be the path to a Vadere project file (ending with .project)."
+            )
 
         parent_path = parent_folder_clean(project_path)
 
         # This is by Vaderes convention:
         scenarios_path = os.path.join(parent_path, "scenarios")
-        super(ProjectOutput, self).__init__(scenarios_path, model, output_path=parent_path, output_folder="output")
+        super(ProjectOutput, self).__init__(
+            scenarios_path, model, output_path=parent_path, output_folder="output"
+        )
 
 
 class SingleExistScenario(Request, ServerRequest):
-
-    def __init__(self, path_scenario,
-                 qoi,
-                 model,
-                 scenario_runs=1,
-                 output_path=None,
-                 output_folder=None,
-                 handle_existing="ask_user_replace"):
+    def __init__(
+        self,
+        path_scenario,
+        qoi,
+        model,
+        scenario_runs=1,
+        output_path=None,
+        output_folder=None,
+        handle_existing="ask_user_replace",
+    ):
 
         self.path_scenario = os.path.abspath(path_scenario)
-        assert os.path.exists(self.path_scenario) and self.path_scenario.endswith(".scenario")
+        assert os.path.exists(self.path_scenario) and self.path_scenario.endswith(
+            ".scenario"
+        )
 
         scenario_name = os.path.basename(path_scenario).replace(".scenario", "")
 
-        self.env_man = EnvironmentManager.create_new_environment(base_path=output_path,
-                                                                 env_name=output_folder,
-                                                                 handle_existing=handle_existing)
+        self.env_man = EnvironmentManager.create_new_environment(
+            base_path=output_path,
+            env_name=output_folder,
+            handle_existing=handle_existing,
+        )
         self.scenario_runs = scenario_runs
 
         if qoi is not None:
             if isinstance(qoi, (str, list)):
                 with open(path_scenario, "r") as f:
                     basis_scenario = json.load(f)
-                qoi = QuantityOfInterest(basis_scenario=basis_scenario, requested_files=qoi)
+                qoi = QuantityOfInterest(
+                    basis_scenario=basis_scenario, requested_files=qoi
+                )
             else:
                 raise ValueError("Invalid format of Quantity of Interest")
 
-        request_item_list = self._generate_request_list(scenario_name=scenario_name, path_scenario=path_scenario)
+        request_item_list = self._generate_request_list(
+            scenario_name=scenario_name, path_scenario=path_scenario
+        )
 
         super(SingleExistScenario, self).__init__(request_item_list, model, qoi)
         ServerRequest.__init__(self)
@@ -458,18 +537,24 @@ class SingleExistScenario(Request, ServerRequest):
 
         if self.scenario_runs == 1:
             # No need to attach the run_id if there is only one run
-            output_folder = lambda run_id: os.path.join(self.env_man.env_name, "vadere_output")
+            output_folder = lambda run_id: os.path.join(
+                self.env_man.env_name, "vadere_output"
+            )
         else:
-            output_folder = lambda run_id: os.path.join(self.env_man.env_name,
-                                                        f"vadere_output_{str(run_id).zfill(len(str(run_id)))}")
+            output_folder = lambda run_id: os.path.join(
+                self.env_man.env_name,
+                f"vadere_output_{str(run_id).zfill(len(str(run_id)))}",
+            )
 
         request_item_list = list()
         for run_id in range(self.scenario_runs):
-            request_item = RequestItem(parameter_id=scenario_name,
-                                       run_id=run_id,
-                                       scenario_path=path_scenario,
-                                       base_path=self.env_man.base_path,
-                                       output_folder=output_folder(run_id=run_id))
+            request_item = RequestItem(
+                parameter_id=scenario_name,
+                run_id=run_id,
+                scenario_path=path_scenario,
+                base_path=self.env_man.base_path,
+                output_folder=output_folder(run_id=run_id),
+            )
             request_item_list.append(request_item)
         return request_item_list
 
@@ -482,27 +567,35 @@ class SingleExistScenario(Request, ServerRequest):
 
         kwargs = cls.open_arg_pickle(remote_pickle_arg_path)
 
-        setup = cls(path_scenario=kwargs["path_scenario"],
-                    qoi=kwargs["qoi"],
-                    model=kwargs["model"],
-                    scenario_runs=kwargs["scenario_runs"],
-                    output_path=None,
-                    output_folder=kwargs["remote_env_name"],
-                    handle_existing="write_in")  # needs to write in because the environment already exists
+        setup = cls(
+            path_scenario=kwargs["path_scenario"],
+            qoi=kwargs["qoi"],
+            model=kwargs["model"],
+            scenario_runs=kwargs["scenario_runs"],
+            output_path=None,
+            output_folder=kwargs["remote_env_name"],
+            handle_existing="write_in",
+        )  # needs to write in because the environment already exists
 
         res = setup.run(njobs=kwargs["njobs"])
         cls.dump_result_pickle(res, kwargs["remote_pickle_res_path"])
 
     def remote(self, njobs=1):
 
-        local_pickle_content = {"njobs": njobs, "qoi": self.qoi, "scenario_runs": self.scenario_runs}
+        local_pickle_content = {
+            "njobs": njobs,
+            "qoi": self.qoi,
+            "scenario_runs": self.scenario_runs,
+        }
         local_transfer_files = {"path_scenario": self.path_scenario}
 
-        self._remote_ssh_logic(local_env_man=self.env_man,
-                               local_pickle_content=local_pickle_content,
-                               local_transfer_files=local_transfer_files,
-                               local_model_obj=self.model,
-                               transfer_output=True)
+        self._remote_ssh_logic(
+            local_env_man=self.env_man,
+            local_pickle_content=local_pickle_content,
+            local_transfer_files=local_transfer_files,
+            local_model_obj=self.model,
+            transfer_output=True,
+        )
 
 
 if __name__ == "__main__":

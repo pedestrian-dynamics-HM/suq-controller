@@ -5,6 +5,7 @@ from typing import *
 
 import numpy as np
 import pandas as pd
+
 # http://scikit-learn.org/stable/modules/generated/sklearn.model_selection.ParameterSampler.html
 from sklearn.model_selection import ParameterGrid
 
@@ -41,9 +42,13 @@ class ParameterVariationBase(metaclass=abc.ABCMeta):
         idx_ids = self._points.index.values.repeat(scenario_runs)
         idx_run_ids = np.tile(np.arange(scenario_runs), self._points.shape[0])
 
-        self._points = pd.DataFrame(self._points.values.repeat(scenario_runs, axis=0),
-                                    index=pd.MultiIndex.from_arrays([idx_ids, idx_run_ids], names=["id", "run_id"]),
-                                    columns=self._points.columns)
+        self._points = pd.DataFrame(
+            self._points.values.repeat(scenario_runs, axis=0),
+            index=pd.MultiIndex.from_arrays(
+                [idx_ids, idx_run_ids], names=["id", "run_id"]
+            ),
+            columns=self._points.columns,
+        )
         return self
 
     def _add_dict_points(self, points: List[dict]):
@@ -53,7 +58,9 @@ class ParameterVariationBase(metaclass=abc.ABCMeta):
         df = pd.concat([self._points, pd.DataFrame(points)], ignore_index=True, axis=0)
         df.index.name = ParameterVariationBase.ROW_IDX_NAME_ID
 
-        df.columns = pd.MultiIndex.from_product([[ParameterVariationBase.MULTI_IDX_LEVEL0_PAR], df.columns])
+        df.columns = pd.MultiIndex.from_product(
+            [[ParameterVariationBase.MULTI_IDX_LEVEL0_PAR], df.columns]
+        )
         self._points = df
 
     def _add_df_points(self, points: pd.DataFrame):
@@ -64,7 +71,9 @@ class ParameterVariationBase(metaclass=abc.ABCMeta):
 
         for k in keys:
             try:  # check that the value is 'final' (i.e. not another sub-directory) and that the key is unique.
-                deep_dict_lookup(scenario, k, check_final_leaf=True, check_unique_key=True)
+                deep_dict_lookup(
+                    scenario, k, check_final_leaf=True, check_unique_key=True
+                )
             except ValueError as e:
                 raise e  # re-raise Exception
         return True
@@ -74,7 +83,9 @@ class ParameterVariationBase(metaclass=abc.ABCMeta):
 
     def par_iter(self):
 
-        for (par_id, run_id), row in self._points[ParameterVariationBase.MULTI_IDX_LEVEL0_PAR].iterrows():
+        for (par_id, run_id), row in self._points[
+            ParameterVariationBase.MULTI_IDX_LEVEL0_PAR
+        ].iterrows():
             # TODO: this is not nice coding, however, there are some issues. See issue #40
             parameter_variation = dict(row)
             delete_keys = list()
@@ -91,24 +102,24 @@ class ParameterVariationBase(metaclass=abc.ABCMeta):
 
 
 class UserDefinedSampling(ParameterVariationBase):
-
     def __init__(self, points: List[dict]):
         super(UserDefinedSampling, self).__init__()
         self._add_dict_points(points)
 
 
 class FullGridSampling(ParameterVariationBase):
-
     def __init__(self, grid: Union[dict, ParameterGrid]):
         super(FullGridSampling, self).__init__()
-        
+
         if isinstance(grid, dict):
             self._add_sklearn_grid(ParameterGrid(param_grid=grid))
         else:
             self._add_sklearn_grid(grid)
 
     def _add_sklearn_grid(self, grid: ParameterGrid):
-        self._add_dict_points(points=list(grid))         # list creates all points described by the 'grid'
+        self._add_dict_points(
+            points=list(grid)
+        )  # list creates all points described by the 'grid'
 
 
 class RandomSampling(ParameterVariationBase):
@@ -121,8 +132,10 @@ class RandomSampling(ParameterVariationBase):
         self.dists = dict()
 
     def add_parameter(self, par: str, dist: np.random, **dist_pars: dict):
-        assert self._add_parameters, "The grid was already generated. For now it is not allowed to add more parameters " \
-                                     "afterwards"
+        assert self._add_parameters, (
+            "The grid was already generated. For now it is not allowed to add more parameters "
+            "afterwards"
+        )
         self.dists[par] = {"dist": dist, "dist_pars": dist_pars}
 
     def _create_distribution_samples(self, nr_samples):
@@ -139,9 +152,11 @@ class RandomSampling(ParameterVariationBase):
             try:
                 outcomes = self.dists[d]["dist"](**dist_args)
             except:
-                raise RuntimeError(f"Distribution {d} failed to sample. Every distribution has to support the keyword"
-                                   f" 'size'. It is recommended to use distributions from numpy: "
-                                   f"https://docs.scipy.org/doc/numpy-1.13.0/reference/routines.random.html")
+                raise RuntimeError(
+                    f"Distribution {d} failed to sample. Every distribution has to support the keyword"
+                    f" 'size'. It is recommended to use distributions from numpy: "
+                    f"https://docs.scipy.org/doc/numpy-1.13.0/reference/routines.random.html"
+                )
 
             for i in range(nr_samples):
                 samples[i][d] = outcomes[i]
@@ -155,7 +170,6 @@ class RandomSampling(ParameterVariationBase):
 
 
 class BoxSamplingUlamMethod(ParameterVariationBase):
-
     def __init__(self):
         super(BoxSamplingUlamMethod, self).__init__()
         self._edges = None
@@ -165,12 +179,14 @@ class BoxSamplingUlamMethod(ParameterVariationBase):
 
     def _generate_interior_start(self, edges, nr_testf):
 
-        boxes = len(edges)-1
+        boxes = len(edges) - 1
         arr = np.zeros(boxes * nr_testf)
 
         for i in range(boxes):
-            s, e = edges[i:i+2]
-            arr[i*nr_testf: i*nr_testf+nr_testf] = np.linspace(s, e, nr_testf+2)[1:-1]
+            s, e = edges[i : i + 2]
+            arr[i * nr_testf : i * nr_testf + nr_testf] = np.linspace(
+                s, e, nr_testf + 2
+            )[1:-1]
         return arr
 
     def _get_box(self, row):
@@ -191,7 +207,11 @@ class BoxSamplingUlamMethod(ParameterVariationBase):
             idx_y = _get_idx(vals[1], 1)
             idx_z = _get_idx(vals[2], 2)
 
-        box = idx_x + idx_y * (self._nr_boxes[0]) + idx_z * (self._nr_boxes[0] * self._nr_boxes[1])
+        box = (
+            idx_x
+            + idx_y * (self._nr_boxes[0])
+            + idx_z * (self._nr_boxes[0] * self._nr_boxes[1])
+        )
         return box
 
     def create_grid(self, par, lb, rb, nr_boxes, nr_testf):
@@ -221,7 +241,7 @@ class BoxSamplingUlamMethod(ParameterVariationBase):
         for i in range(3):
             if par[i] is not None:
                 # +1 bc. edges+1 = nr_boxes when the parameter
-                self._edges[i] = np.linspace(lb[i], rb[i], nr_boxes[i]+1)
+                self._edges[i] = np.linspace(lb[i], rb[i], nr_boxes[i] + 1)
 
                 # the linspace guarantees equidistant box-domains
                 self._box_width[i] = self._edges[i][1] - self._edges[i][0]
@@ -238,13 +258,19 @@ class BoxSamplingUlamMethod(ParameterVariationBase):
         x_pos, y_pos, z_pos = [None, None, None]
 
         if par[0] is not None:
-            x_pos = self._generate_interior_start(edges=self._edges[0], nr_testf=nr_testf[0])
+            x_pos = self._generate_interior_start(
+                edges=self._edges[0], nr_testf=nr_testf[0]
+            )
 
         if par[1] is not None:
-            y_pos = self._generate_interior_start(edges=self._edges[1], nr_testf=nr_testf[1])
+            y_pos = self._generate_interior_start(
+                edges=self._edges[1], nr_testf=nr_testf[1]
+            )
 
         if par[2] is not None:
-            z_pos = self._generate_interior_start(edges=self._edges[2], nr_testf=nr_testf[2])
+            z_pos = self._generate_interior_start(
+                edges=self._edges[2], nr_testf=nr_testf[2]
+            )
 
         mesh = np.meshgrid(x_pos, y_pos, z_pos, copy=True, indexing="xy")
 
@@ -260,7 +286,8 @@ class BoxSamplingUlamMethod(ParameterVariationBase):
 
         df_final = pd.concat([df_x, df_y, df_z], axis=1)
         df_final.columns = pd.MultiIndex.from_product(
-            [[ParameterVariationBase.MULTI_IDX_LEVEL0_PAR], df_final.columns.values])
+            [[ParameterVariationBase.MULTI_IDX_LEVEL0_PAR], df_final.columns.values]
+        )
         df_final.index.name = ParameterVariationBase.ROW_IDX_NAME_ID
 
         df_final["boxid"] = df_final.T.apply(self._get_box)
@@ -269,8 +296,8 @@ class BoxSamplingUlamMethod(ParameterVariationBase):
 
     def generate_markov_matrix(self, result):
 
-        #bool_idx = np.isnan(result).any(axis=1)
-        #result = result.loc[~bool_idx, :]
+        # bool_idx = np.isnan(result).any(axis=1)
+        # result = result.loc[~bool_idx, :]
 
         def apply_result(point):
             row = point.iloc[:, 0]
@@ -283,7 +310,7 @@ class BoxSamplingUlamMethod(ParameterVariationBase):
         box_start = self._points["boxid"]
         box_finish = result.loc[:, idx[:, "last"]].groupby(level=0).apply(apply_result)
 
-        nr_boxes = box_start.max() + 1   # box ids start with 0
+        nr_boxes = box_start.max() + 1  # box ids start with 0
 
         markov = np.zeros([nr_boxes, nr_boxes])
 
@@ -303,7 +330,9 @@ class BoxSamplingUlamMethod(ParameterVariationBase):
             markov[i, vals.astype(np.int)] = counts
 
         bool_idx = markov.sum(axis=1).astype(np.bool)
-        markov[bool_idx, :] = markov[bool_idx, :] / markov[bool_idx, :].sum(axis=1)[:, np.newaxis]
+        markov[bool_idx, :] = (
+            markov[bool_idx, :] / markov[bool_idx, :].sum(axis=1)[:, np.newaxis]
+        )
 
         return markov
 
@@ -316,25 +345,31 @@ class BoxSamplingUlamMethod(ParameterVariationBase):
 
     def uniform_distribution_over_boxes_included(self, points: pd.DataFrame):
 
-        boxes_included = points.groupby(level=0, axis=0).apply(lambda row: self._get_box(row.iloc[0, :]))
+        boxes_included = points.groupby(level=0, axis=0).apply(
+            lambda row: self._get_box(row.iloc[0, :])
+        )
         boxes_included = np.unique(boxes_included)
 
         all_boxes = self._points["boxid"].max() + 1
 
         initial_condition = np.zeros(all_boxes)
-        initial_condition[boxes_included.astype(np.int)] = 1 / boxes_included.shape[0]  # uniform
+        initial_condition[boxes_included.astype(np.int)] = (
+            1 / boxes_included.shape[0]
+        )  # uniform
 
         return initial_condition
 
-    def transfer_initial_condition(self, markov: np.array, initial_cond: np.array, nrsteps: int):
+    def transfer_initial_condition(
+        self, markov: np.array, initial_cond: np.array, nrsteps: int
+    ):
 
         all_boxes = self._points["boxid"].max() + 1
 
-        states = np.zeros([all_boxes, nrsteps+1])
+        states = np.zeros([all_boxes, nrsteps + 1])
         states[:, 0] = initial_cond
 
-        for i in range(1, nrsteps+1):
-            states[:, i] = markov.T @ states[:, i-1]
+        for i in range(1, nrsteps + 1):
+            states[:, i] = markov.T @ states[:, i - 1]
 
         return states
 
@@ -346,35 +381,66 @@ class BoxSamplingUlamMethod(ParameterVariationBase):
         x_dir = lambda box_id: (np.mod(box_id, self._nr_boxes[0])).astype(np.int)
         y_dir = lambda box_id: (box_id / self._nr_boxes[0]).astype(np.int)
 
-        df = pd.DataFrame(0, index=np.arange(state.shape[0]), columns=["x", "y", "z", "dx", "dy", "dz"])
+        df = pd.DataFrame(
+            0,
+            index=np.arange(state.shape[0]),
+            columns=["x", "y", "z", "dx", "dy", "dz"],
+        )
 
         idx_edges_x = x_dir(np.arange(all_boxes))
         idx_edges_y = y_dir(np.arange(all_boxes))
 
         for i in range(idx_edges_x.shape[0]):
-            df.loc[i, ["x", "y", "z"]] = [self._edges[0][idx_edges_x[i]], self._edges[1][idx_edges_y[i]], 0]
-            df.loc[i, ["dx", "dy", "dz"]] = [self._box_width[0], self._box_width[1], state[i]]
+            df.loc[i, ["x", "y", "z"]] = [
+                self._edges[0][idx_edges_x[i]],
+                self._edges[1][idx_edges_y[i]],
+                0,
+            ]
+            df.loc[i, ["dx", "dy", "dz"]] = [
+                self._box_width[0],
+                self._box_width[1],
+                state[i],
+            ]
         return df
 
     def plot_states(self, states, cols, rows):
         # https://matplotlib.org/gallery/mplot3d/3d_bars.html
 
         import matplotlib.pyplot as plt
+
         # This import registers the 3D projection, but is otherwise unused.
 
         fig = plt.figure(figsize=(8, 3))
 
         for sidx in range(states.shape[1]):
 
-            ax = fig.add_subplot(cols, rows, sidx+1, projection='3d')
+            ax = fig.add_subplot(cols, rows, sidx + 1, projection="3d")
 
             df = self._get_bar_data_from_state(states[:, sidx])
 
-            zeros = df.loc[df["dz"] < 1E-3]
+            zeros = df.loc[df["dz"] < 1e-3]
             nonzero = df.loc[df["dz"] != 0]
 
-            ax.bar3d(zeros["x"], zeros["y"], zeros["z"], zeros["dx"], zeros["dy"], zeros["dz"], color="gray", shade=True)
-            ax.bar3d(nonzero["x"], nonzero["y"], nonzero["z"], nonzero["dx"], nonzero["dy"], nonzero["dz"], color="red", shade=True)
+            ax.bar3d(
+                zeros["x"],
+                zeros["y"],
+                zeros["z"],
+                zeros["dx"],
+                zeros["dy"],
+                zeros["dz"],
+                color="gray",
+                shade=True,
+            )
+            ax.bar3d(
+                nonzero["x"],
+                nonzero["y"],
+                nonzero["z"],
+                nonzero["dx"],
+                nonzero["dy"],
+                nonzero["dz"],
+                color="red",
+                shade=True,
+            )
 
             ax.set_xlabel("x")
             ax.set_ylabel("y")
@@ -386,8 +452,17 @@ class BoxSamplingUlamMethod(ParameterVariationBase):
 
 if __name__ == "__main__":
     par = BoxSamplingUlamMethod()
-    par.create_grid(["dynamicElements.[id==1].position.x", "dynamicElements.[id==1].position.y", None],
-                    lb=[0, 0, 0], rb=[20, 10, 0], nr_boxes=[20, 10, 0], nr_testf=[1, 1, 0])
+    par.create_grid(
+        [
+            "dynamicElements.[id==1].position.x",
+            "dynamicElements.[id==1].position.y",
+            None,
+        ],
+        lb=[0, 0, 0],
+        rb=[20, 10, 0],
+        nr_boxes=[20, 10, 0],
+        nr_testf=[1, 1, 0],
+    )
 
     par.plot_states(initial_cond)
 
@@ -400,12 +475,17 @@ if __name__ == "__main__":
     em = EnvironmentManager("corner")
 
     pv = BoxSamplingUlamMethod()
-    pv.create_grid(["speedDistributionStandardDeviation", "speedDistributionMean", "minimumSpeed"], [0, 1, 2], [1, 2, 3], [2, 2, 2], [2, 2, 2])
+    pv.create_grid(
+        ["speedDistributionStandardDeviation", "speedDistributionMean", "minimumSpeed"],
+        [0, 1, 2],
+        [1, 2, 3],
+        [2, 2, 2],
+        [2, 2, 2],
+    )
 
-
-    #pv = FullGridSampling()
-    #pv.add_dict_grid({"speedDistributionStandardDeviation": [0.1, 0.2, 0.3, 0.4]})
-    #print(pv.points)
+    # pv = FullGridSampling()
+    # pv.add_dict_grid({"speedDistributionStandardDeviation": [0.1, 0.2, 0.3, 0.4]})
+    # print(pv.points)
 
     # pv = RandomSampling(em)
     # pv.add_parameter("speedDistributionStandardDeviation", np.random.normal)

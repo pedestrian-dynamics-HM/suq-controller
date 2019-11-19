@@ -14,15 +14,17 @@ class FileDataInfo(object):
 
     # Implemented in Vadere merge request !38, this is only a fallback mode and requires manual updating if there are
     # changes in Vadere. See also vadere issue #199 and #201.
-    map_outputtype2index = {"IdOutputFile": 1,
-                            "LogEventOutputFile": 1,
-                            "NoDataKeyOutputFile": 0,
-                            "PedestrianIdOutputFile": 1,
-                            "TimestepOutputFile": 1,
-                            "TimestepPedestrianIdOutputFile": 2,
-                            "TimestepPedestrianIdOverlapOutputFile": 3,
-                            "TimestepPositionOutputFile": 3,
-                            "TimestepRowOutputFile": 2}
+    map_outputtype2index = {
+        "IdOutputFile": 1,
+        "LogEventOutputFile": 1,
+        "NoDataKeyOutputFile": 0,
+        "PedestrianIdOutputFile": 1,
+        "TimestepOutputFile": 1,
+        "TimestepPedestrianIdOutputFile": 2,
+        "TimestepPedestrianIdOverlapOutputFile": 3,
+        "TimestepPositionOutputFile": 3,
+        "TimestepRowOutputFile": 2,
+    }
 
     printFallbackMsg = False
 
@@ -36,13 +38,14 @@ class FileDataInfo(object):
         except KeyError:
             if not self.printFallbackMsg:
                 self.printFallbackMsg = True
-                print(f"WARNING: file type {self.output_key} was not found in list, this may require an update. Setting "
-                      f"number of index columns to 1.")
-            self.nr_row_indices = 1   # use simply first column as index
+                print(
+                    f"WARNING: file type {self.output_key} was not found in list, this may require an update. Setting "
+                    f"number of index columns to 1."
+                )
+            self.nr_row_indices = 1  # use simply first column as index
 
 
 class QuantityOfInterest(object):
-
     def __init__(self, basis_scenario: dict, requested_files: Union[List[str], str]):
 
         assert isinstance(requested_files, (list, str))
@@ -69,11 +72,15 @@ class QuantityOfInterest(object):
                 sel_procs = self._select_corresp_processors(pf, processsors)
                 req_qois.append(FileDataInfo(process_file=pf, processors=sel_procs))
 
-                requested_files.remove(filename)  # -> processed, list should be empty when leaving function
+                requested_files.remove(
+                    filename
+                )  # -> processed, list should be empty when leaving function
 
         if requested_files:  # has to be empty
-            raise ValueError(f"The requested files {requested_files} are not set in the Vadere scenario: \n "
-                             f"{process_files}")
+            raise ValueError(
+                f"The requested files {requested_files} are not set in the Vadere scenario: \n "
+                f"{process_files}"
+            )
 
         return req_qois
 
@@ -92,12 +99,16 @@ class QuantityOfInterest(object):
                     if not found:
                         found = True
                     else:
-                        raise ValueError("The Vadere scenario is not correctly set up! There are two processors with "
-                                         f"the id={pid}.")
+                        raise ValueError(
+                            "The Vadere scenario is not correctly set up! There are two processors with "
+                            f"the id={pid}."
+                        )
 
             if not found:
-                raise ValueError(f"The Vadere scenario is not correctly set up! Processor id {pid} could not be found "
-                                 "in 'processors'.")
+                raise ValueError(
+                    f"The Vadere scenario is not correctly set up! Processor id {pid} could not be found "
+                    "in 'processors'."
+                )
 
         return selected_procs
 
@@ -140,7 +151,9 @@ class QuantityOfInterest(object):
         for k in self.req_qois:
             filepath = os.path.join(output_path, k.filename)
             df_data = self._read_csv(k, filepath)
-            read_data[k.filename] = self._add_parid2idx(df_data, par_id, run_id)    # filename is identifier for QoI
+            read_data[k.filename] = self._add_parid2idx(
+                df_data, par_id, run_id
+            )  # filename is identifier for QoI
 
         return read_data
 

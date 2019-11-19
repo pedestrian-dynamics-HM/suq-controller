@@ -7,28 +7,33 @@ import pathlib
 
 
 # configuration of the suq-controller
-DEFAULT_SUQ_CONFIG = {"default_vadere_src_path": "TODO",   # TODO Feature: compile Vadere before using the jar file
-                      "server": {
-                          "host": "",
-                          "user": "",
-                          "port": -1
-                      }}
+DEFAULT_SUQ_CONFIG = {
+    "default_vadere_src_path": "TODO",  # TODO Feature: compile Vadere before using the jar file
+    "server": {"host": "", "user": "", "port": -1},
+}
 
 
 def check_setup(_paths_class):
 
-    if not os.path.exists(_paths_class.path_cfg_folder()) and _paths_class.is_package_paths():
+    if (
+        not os.path.exists(_paths_class.path_cfg_folder())
+        and _paths_class.is_package_paths()
+    ):
         print(f"INFO: Setting up configuration folder {_paths_class.path_cfg_folder()}")
         # the next two checks will fail automatically too, because the folder is empty
         os.mkdir(_paths_class.path_cfg_folder())
 
     if not os.path.exists(_paths_class.path_suq_config_file()):
-        print(f"INFO: Setting up default configuration file located at {_paths_class.path_suq_config_file()}")
+        print(
+            f"INFO: Setting up default configuration file located at {_paths_class.path_suq_config_file()}"
+        )
         _paths_class.store_config(DEFAULT_SUQ_CONFIG)
 
     if not os.path.exists(_paths_class.path_container_folder()):
-        print(f"INFO: Setting up the default container path (which will store output of simulation runs). "
-              f"Location {_paths_class.path_container_folder()}")
+        print(
+            f"INFO: Setting up the default container path (which will store output of simulation runs). "
+            f"Location {_paths_class.path_container_folder()}"
+        )
         os.mkdir(_paths_class.path_container_folder())
 
     return _paths_class

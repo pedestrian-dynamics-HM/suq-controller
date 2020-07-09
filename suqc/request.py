@@ -98,7 +98,6 @@ class RequestItem(object):
         self.required_time = required_time
         self.return_code = return_code
 
-
 class Request(object):
 
     PARAMETER_ID = "id"
@@ -277,8 +276,10 @@ class Request(object):
         njobs = njobs_check_and_set(njobs=njobs, ntasks=nr_simulations)
 
         if njobs == 1:
+            # TODO: generate the scenarios with single process
             self._sp_query()
         else:
+            # TODO: generate the scenarios with n_jobs
             self._mp_query(njobs=njobs)
 
         if self.qoi is not None:
@@ -313,6 +314,11 @@ class VariationBase(Request, ServerRequest):
             )
 
         self.set_qoi(qoi)
+
+        # TODO: -- only create request_item_list here
+        request_item_list = self.create_request_item_list()
+
+
         request_item_list = self.scenario_creation(njobs)
 
         super(VariationBase, self).__init__(request_item_list, self.model, self.qoi)
@@ -328,13 +334,22 @@ class VariationBase(Request, ServerRequest):
         else:
             raise ValueError(f"Failed to set qoi. Check type(qoi)={type(qoi)}")
 
-    def scenario_creation(self, njobs):
+    def scenario_creation(self, request_item_list, njobs):
         scenario_creation = VadereScenarioCreation(
             self.env_man, self.parameter_variation, self.post_changes
         )
         request_item_list = scenario_creation.generate_scenarios(njobs)
         return request_item_list
 
+    def create_request_item_list(self):
+        for parameter_id, run_id, par_change in self.parameter_variation.par_iter():
+            result_item = RequestItem(
+                parameter_id=parameter_id,
+                run_id=run_id,
+                scenario_path=scenario_path,
+                base_path=self.env_man.base_path,
+                output_folder=output_folder,
+            )
     def _remove_output(self):
         if self.env_man.env_path is not None:
             shutil.rmtree(self.env_man.env_path)

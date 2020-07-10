@@ -29,6 +29,7 @@ DEFAULT_SUQ_CONFIG = {
 
 
 class AbstractConsoleWrapper(object):
+
     @classmethod
     def infer_model(cls, model) -> "AbstractConsoleWrapper":
 
@@ -353,6 +354,10 @@ class AbstractEnvironmentManager(object):
 
     def get_env_outputfolder_path(self):
         raise NotImplemented
+
+    def set_n_digits(self, nr_variations, nr_runs):
+        self.nr_digits_variation = len(str(nr_variations))
+        self.nr_digits_runs = len(str(nr_runs))
 
     def get_variation_output_folder(self, parameter_id, run_id):
         scenario_filename = self._scenario_variation_filename(

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-import json
 import multiprocessing
 import os
 import shutil
@@ -82,12 +81,16 @@ def read_from_existing_output(
 
 
 class RequestItem(object):
-    def __init__(self, parameter_id, run_id, scenario_path, base_path, output_folder):
+    def __init__(self, parameter_id, run_id, par_change, scenario_path, base_path,
+                 output_folder):
+
         self.parameter_id = parameter_id
         self.run_id = run_id
+        self.par_change = par_change
         self.base_path = base_path
         self.output_folder = output_folder
         self.scenario_path = scenario_path
+
 
         self.output_path = os.path.join(self.base_path, self.output_folder)
 
@@ -97,6 +100,14 @@ class RequestItem(object):
     def add_meta_info(self, required_time, return_code):
         self.required_time = required_time
         self.return_code = return_code
+
+    def __repr__(self):
+        _str = f"parameter_id={(self.parameter_id)}\n"
+        _str += f"run_id={(self.run_id)} \n"
+        _str += f"base_path={(self.base_path)}\n"
+        _str += f"output_folder={(self.output_folder)}\n"
+        _str += f"scenario_path={(self.scenario_path)}\n\n"
+        return _str
 
 class Request(object):
 
@@ -297,7 +308,6 @@ class VariationBase(Request, ServerRequest):
         model: Union[str, AbstractConsoleWrapper],
         qoi: Union[str, List[str], VadereQuantityOfInterest],
         post_changes: PostScenarioChangesBase = None,
-        njobs: int = 1,
         remove_output=False,
     ):
 
@@ -315,11 +325,7 @@ class VariationBase(Request, ServerRequest):
 
         self.set_qoi(qoi)
 
-        # TODO: -- only create request_item_list here
         request_item_list = self.create_request_item_list()
-
-
-        request_item_list = self.scenario_creation(njobs)
 
         super(VariationBase, self).__init__(request_item_list, self.model, self.qoi)
         ServerRequest.__init__(self)
@@ -338,23 +344,40 @@ class VariationBase(Request, ServerRequest):
         scenario_creation = VadereScenarioCreation(
             self.env_man, self.parameter_variation, self.post_changes
         )
-        request_item_list = scenario_creation.generate_scenarios(njobs)
-        return request_item_list
+        scenario_creation.generate_scenarios(request_item_list, njobs)
 
     def create_request_item_list(self):
+
+        result_item_list = list()
+
+        self.env_man.set_n_digits(
+            nr_variations=self.parameter_variation.nr_parameter_variations(),
+            nr_runs=self.parameter_variation.nr_scenario_runs())
+
         for parameter_id, run_id, par_change in self.parameter_variation.par_iter():
+            output_folder = self.env_man.get_variation_output_folder(parameter_id, run_id)
+            scenario_path = self.env_man.scenario_variation_path(par_id=parameter_id,
+                                                                 run_id=run_id)
             result_item = RequestItem(
                 parameter_id=parameter_id,
                 run_id=run_id,
+                par_change=par_change,
                 scenario_path=scenario_path,
                 base_path=self.env_man.base_path,
                 output_folder=output_folder,
             )
+
+            result_item_list.append(result_item)
+        return result_item_list
+
     def _remove_output(self):
         if self.env_man.env_path is not None:
             shutil.rmtree(self.env_man.env_path)
 
     def run(self, njobs: int = 1):
+
+        self.scenario_creation(request_item_list=self.request_item_list, njobs=njobs)
+
         qoi_result_df, meta_info = super(VariationBase, self).run(njobs)
 
         # add another level to distinguish the columns with the parameter lookup
@@ -383,7 +406,6 @@ class VariationBase(Request, ServerRequest):
             model=kwargs["model"],
             qoi=kwargs["qoi"],
             post_changes=kwargs["post_changes"],
-            njobs=kwargs["njobs"],
             remove_output=False,
         )  # the output for remote will be removed after all is transferred
 
@@ -720,7 +742,6 @@ class DictVariation(VariationBase, ServerRequest):
             model=model,
             qoi=qoi,
             post_changes=post_changes,
-            njobs=njobs_create_scenarios,
             remove_output=remove_output,
         )
 

@@ -10,7 +10,7 @@ sys.path.append(os.path.abspath("."))
 sys.path.append(os.path.abspath(".."))
 
 
-run_local = True
+run_local = False
 
 
 ###############################################################################################################
@@ -40,7 +40,7 @@ if __name__ == "__main__":  # main required by Windows to run in parallel
 
     if run_local:
         par_var, data = setup.run(
-            -1
+            1
         )  # -1 indicates to use all cores available to parallelize the scenarios
     else:
         par_var, data = setup.remote(-1)

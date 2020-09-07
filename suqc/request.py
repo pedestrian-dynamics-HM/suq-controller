@@ -538,15 +538,27 @@ class CoupledDictVariation(VariationBase, ServerRequest):
         #     if not success:
         #         print("INFO: Simulation failed. Proceed succesful data only.")
         #         par_var, data = self.get_sim_results_from_temp()
+
+        # nr of rows = nr of parameter settings = #simulations
+        nr_simulations = len(self.request_item_list)
+        njobs = njobs_check_and_set(njobs=njobs, ntasks=nr_simulations)
+
         try:
-            remove_output = self.remove_output
-            if self.is_read_old_data():
-                self.remove_output = False
-            par_var, data = super(CoupledDictVariation, self).run(njobs)
-            if self.is_read_old_data():
+            if njobs == 1:
+                self._sp_query()
+            else:
+                self._mp_query(njobs=njobs)
+
+            if self.is_read_old_data() is False:
+                data = self._compile_qoi()
+                par_var = self._compile_run_info()
+                par_var = self._add_meta_info_multiindex(par_var)
+                data = pd.concat([self.parameter_variation.points, par_var], axis=1)
+            else:
                 par_var, data = self.get_sim_results_from_temp()
-            if remove_output and self.is_read_old_data():
-                self._remove_output()
+
+            self._remove_output()
+
         except:
             print("INFO: Proceed succesful data only.")
             par_var, data = self.get_sim_results_from_temp()

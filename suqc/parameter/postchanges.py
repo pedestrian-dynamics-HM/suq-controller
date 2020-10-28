@@ -112,8 +112,9 @@ class ChangeRandomNumber(PostScenarioChange):
         elif self._israndint:
             # 4294967295 = max unsigned 32 bit integer
             rnr = np.random.randint(0, 4294967295)
-        else:  # --> self._isparid
-            rnr = parameter_id * 1e6 + run_id  # the 1E6 is required to not have
+        else:  # --> self._is_id_based
+            # the 1E6 is required to not have the same seed
+            rnr = parameter_id * 1e6 + run_id
 
         return {
             ChangeRandomNumber.KEY_FIXED: True,

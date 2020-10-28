@@ -81,8 +81,9 @@ def read_from_existing_output(
 
 
 class RequestItem(object):
-    def __init__(self, parameter_id, run_id, par_change, scenario_path, base_path,
-                 output_folder):
+    def __init__(
+        self, parameter_id, run_id, par_change, scenario_path, base_path, output_folder
+    ):
 
         self.parameter_id = parameter_id
         self.run_id = run_id
@@ -90,7 +91,6 @@ class RequestItem(object):
         self.base_path = base_path
         self.output_folder = output_folder
         self.scenario_path = scenario_path
-
 
         self.output_path = os.path.join(self.base_path, self.output_folder)
 
@@ -104,10 +104,9 @@ class RequestItem(object):
     def __repr__(self):
         _str = f"parameter_id={(self.parameter_id)}\n"
         _str += f"run_id={(self.run_id)} \n"
-        _str += f"base_path={(self.base_path)}\n"
-        _str += f"output_folder={(self.output_folder)}\n"
-        _str += f"scenario_path={(self.scenario_path)}\n\n"
+        _str += f"added_results={hasattr(self, 'required_time')} \n"
         return _str
+
 
 class Request(object):
 
@@ -116,7 +115,7 @@ class Request(object):
 
     def __init__(
         self,
-        request_item_list: List[RequestItem],
+        request_item_list: ParameterVariationBase,
         model: Union[str, AbstractConsoleWrapper],
         qoi: Union[VadereQuantityOfInterest, None],
     ):
@@ -311,11 +310,12 @@ class VariationBase(Request, ServerRequest):
         remove_output=False,
     ):
 
-        self.parameter_variation = parameter_variation
         self.env_man = env_man
         self.post_changes = post_changes
         self.model = model
         self.remove_output = remove_output
+
+        self.parameter_variation = self.attach_scenario_location(parameter_variation)
 
         if qoi is None and remove_output:
             raise ValueError(
@@ -346,18 +346,38 @@ class VariationBase(Request, ServerRequest):
         )
         scenario_creation.generate_scenarios(request_item_list, njobs)
 
+    def attach_scenario_location(self, parameter_variation):
+
+        parameter_variation.points["Filepaths", "vadere_scenario_path"] = [
+            self.env_man.scenario_variation_path(par_id=par_id, run_id=run_id)
+            for par_id, run_id in parameter_variation.points.index
+        ]
+
+        parameter_variation.points["Location", "vadere_output_folder_path"] = [
+            self.env_man.get_variation_output_folder(
+                par_id, run_id
+            )
+            for par_id, run_id in parameter_variation.points.index
+        ]
+
+        return parameter_variation
+
     def create_request_item_list(self):
 
         result_item_list = list()
 
         self.env_man.set_n_digits(
             nr_variations=self.parameter_variation.nr_parameter_variations(),
-            nr_runs=self.parameter_variation.nr_scenario_runs())
+            nr_runs=self.parameter_variation.nr_scenario_runs(),
+        )
 
         for parameter_id, run_id, par_change in self.parameter_variation.par_iter():
-            output_folder = self.env_man.get_variation_output_folder(parameter_id, run_id)
-            scenario_path = self.env_man.scenario_variation_path(par_id=parameter_id,
-                                                                 run_id=run_id)
+            output_folder = self.env_man.get_variation_output_folder(
+                parameter_id, run_id
+            )
+            scenario_path = self.env_man.scenario_variation_path(
+                par_id=parameter_id, run_id=run_id
+            )
             result_item = RequestItem(
                 parameter_id=parameter_id,
                 run_id=run_id,
@@ -577,7 +597,7 @@ class CoupledDictVariation(VariationBase, ServerRequest):
         for k in dict_keys:
             df_k = df.iloc[:, df.columns.get_level_values(0) == k]
             df_k = df_k.dropna()
-            #df_k.columns = df_k.columns.droplevel(0) not sure
+            # df_k.columns = df_k.columns.droplevel(0) not sure
             data[k] = df_k
 
         return par_var, data

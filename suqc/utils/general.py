@@ -11,6 +11,7 @@ import sys
 from typing import Union
 
 import pandas as pd
+from omnetinireader.config_parser import OppConfigFileBase
 
 import suqc
 from suqc.configuration import SuqcConfig
@@ -61,7 +62,7 @@ def cast_series_if_possible(data: Union[pd.DataFrame, pd.Series]):
 def create_folder(path, delete_if_exists=True):
     if delete_if_exists and os.path.exists(path):
         remove_folder(path)
-    os.mkdir(path)
+    os.makedirs(path,exist_ok=True)
 
 
 def check_parent_exists_folder_remove(folder_path, ask_user_to_replace: bool):
@@ -248,3 +249,24 @@ def removeEmptyFolders(path):
                 pass
 
     return
+
+
+def check_simulator(cfg: OppConfigFileBase):
+    """
+    check selected configuration for used mobility simulator and return the
+    respective config file (i.e. *.sceanrio, *.cfg) as well as the simulator name
+    """
+
+    vadere = [p for p in cfg.keys() if "vadereScenarioPath" in p]
+    if len(vadere) == 1:
+        key = vadere[0]
+        return cfg.resolve_path(key), "vadere"
+
+    sumo = [p for p in cfg.keys() if "sumoCfgBase" in p]
+    if len(sumo) == 1:
+        key = sumo[0]
+        return cfg.resolve_path(key), "sumo"
+
+    raise ValueError(
+        "Expected Vadere or Sumo in omnetpp config."
+    )

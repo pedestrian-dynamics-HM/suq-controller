@@ -6,7 +6,8 @@ import warnings
 from distutils.dir_util import copy_tree
 
 import suqc.request  # no "from suqc.request import ..." works because of circular imports
-from suqc.environment import AbstractEnvironmentManager, VadereEnvironmentManager
+import suqc.requestitem
+from suqc.environment import AbstractEnvironmentManager
 from suqc.parameter.postchanges import PostScenarioChangesBase
 from suqc.parameter.sampling import ParameterVariationBase
 from suqc.utils.dict_utils import change_dict, change_dict_ini, deep_dict_lookup
@@ -99,7 +100,7 @@ class AbstractScenarioCreation(object):
             parameter_id, run_id, new_scenario
         )
 
-        result_item = suqc.request.RequestItem(
+        result_item = suqc.requestitem.RequestItem(
             parameter_id=parameter_id,
             run_id=run_id,
             scenario_path=scenario_path,
@@ -141,11 +142,14 @@ class AbstractScenarioCreation(object):
         )
 
         with open(output_path, "w") as outfile:
-            par_var_scenario.writer(outfile)
+            # only save selected config hierarchy (better readability and helps debugging)
+            par_var_scenario.writer(outfile, selected_config_only=True)
 
         folder = os.path.dirname(output_path)
         ini_path = os.path.join(self._env_man.env_path, "additional_rover_files")
         copy_tree(ini_path, folder)
+        # needed output to create result item in CrownetSumo case
+        return output_path
 
 
 class VadereScenarioCreation(AbstractScenarioCreation):
@@ -176,7 +180,6 @@ class VadereScenarioCreation(AbstractScenarioCreation):
 
     def _sampling_check_selected_keys(self):
         self._parameter_variation.check_vadere_keys(self._env_man.vadere_basis_scenario)
-
 
 class CoupledScenarioCreation(AbstractScenarioCreation):
     def __init__(

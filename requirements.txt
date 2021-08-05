@@ -3,4 +3,4 @@ fabric==2.4.0
 pandas>=1.0.3
 numpy>=1.17.0
 scikit-learn>=0.21.0
-omnetinireader==1.2.2
+omnetinireader==1.4.3

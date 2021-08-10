@@ -16,10 +16,10 @@ from suqc.utils.general import create_folder, njobs_check_and_set, remove_folder
 
 class AbstractScenarioCreation(object):
     def __init__(
-        self,
-        env_man: AbstractEnvironmentManager,
-        parameter_variation: ParameterVariationBase,
-        post_change: PostScenarioChangesBase = None,
+            self,
+            env_man: AbstractEnvironmentManager,
+            parameter_variation: ParameterVariationBase,
+            post_change: PostScenarioChangesBase = None,
     ):
         self._env_man = env_man
         self._parameter_variation = parameter_variation
@@ -72,7 +72,7 @@ class AbstractScenarioCreation(object):
     ## vadere specific
 
     def _create_vadere_scenario(
-        self, args
+            self, args
     ):  # TODO: how do multiple arguments work for pool.map functions? (see below)
         """Set up a new scenario and return info of parameter id and location."""
         parameter_id = args[0]  # TODO: this would kind of reduce this ugly code
@@ -127,7 +127,7 @@ class AbstractScenarioCreation(object):
 
     ## omnet specific
     def _create_omnet_scenario(
-        self, args
+            self, args
     ):  # TODO: how do multiple arguments work for pool.map functions? (see below)
         """Set up a new scenario and return info of parameter id and location."""
         parameter_id = args[0]  # TODO: this would kind of reduce this ugly code
@@ -154,10 +154,10 @@ class AbstractScenarioCreation(object):
 
 class VadereScenarioCreation(AbstractScenarioCreation):
     def __init__(
-        self,
-        env_man: AbstractEnvironmentManager,
-        parameter_variation: ParameterVariationBase,
-        post_change: PostScenarioChangesBase = None,
+            self,
+            env_man: AbstractEnvironmentManager,
+            parameter_variation: ParameterVariationBase,
+            post_change: PostScenarioChangesBase = None,
     ):
         super().__init__(env_man, parameter_variation, post_change)
 
@@ -181,12 +181,13 @@ class VadereScenarioCreation(AbstractScenarioCreation):
     def _sampling_check_selected_keys(self):
         self._parameter_variation.check_vadere_keys(self._env_man.vadere_basis_scenario)
 
+
 class CoupledScenarioCreation(AbstractScenarioCreation):
     def __init__(
-        self,
-        env_man: AbstractEnvironmentManager,
-        parameter_variation: ParameterVariationBase,
-        post_change: PostScenarioChangesBase = None,
+            self,
+            env_man: AbstractEnvironmentManager,
+            parameter_variation: ParameterVariationBase,
+            post_change: PostScenarioChangesBase = None,
     ):
         super().__init__(env_man, parameter_variation, post_change)
 
@@ -223,3 +224,43 @@ class CoupledScenarioCreation(AbstractScenarioCreation):
 
         self._parameter_variation.check_vadere_keys(self._env_man.vadere_basis_scenario)
         self._parameter_variation.check_omnet_keys(self._env_man.omnet_basis_ini)
+
+
+class CrownetSumoCreation(AbstractScenarioCreation):
+
+    def __init__(self,
+                 env_man: AbstractEnvironmentManager,
+                 parameter_variation: ParameterVariationBase):
+        super().__init__(env_man, parameter_variation)
+
+    def _sampling_check_selected_keys(self):
+        self._parameter_variation.check_omnet_keys(self._env_man.omnet_basis_ini)
+
+    def _create_omnet_scenario(self, args):
+        ini_path = super()._create_omnet_scenario(args)
+        result_item = suqc.requestitem.RequestItem(
+            parameter_id=args[0],
+            run_id=args[1],
+            scenario_path=ini_path,
+            base_path=self._env_man.base_path,
+            output_folder=self._env_man.get_variation_output_folder(args[0], args[1])
+        )
+        return result_item
+
+    def _sp_creation(self):
+        # omnet specific
+        request_item_list = []
+        variations_omnet = self._parameter_variation.par_iter(simulator="omnet")
+        for par_id, run_id, par_change in variations_omnet:
+            request_item_list.append(self._create_omnet_scenario([par_id, run_id, par_change]))
+
+        return request_item_list
+
+    def _mp_creation(self, njobs):
+        """Multi process function to create all requested scenarios."""
+        pool = multiprocessing.Pool(processes=njobs)
+
+        variations_omnet = self._parameter_variation.par_iter(simulator="omnet")
+        request_item_list = pool.map(self._create_omnet_scenario, variations_omnet)
+
+        return request_item_list

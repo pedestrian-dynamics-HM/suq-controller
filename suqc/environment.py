@@ -234,8 +234,8 @@ class AbstractEnvironmentManager(object):
         cls.env_info_df = info
 
     def write_parameter_info(self, parameter):
-        file_path = os.path.join(self.get_temp_folder(), "parameter.pkl")
-        parameter.to_pickle(file_path)
+        file_path = os.path.join(self.get_temp_folder(), "parameter.csv")
+        parameter.to_csv(file_path)
 
 
 class VadereEnvironmentManager(AbstractEnvironmentManager):
@@ -491,7 +491,8 @@ class CoupledEnvironmentManager(AbstractEnvironmentManager):
             os.mkdir(temp_folder_rover)
 
         df = cls.env_info_df
-        df.to_pickle(os.path.join(temp_folder_rover, "env_info.pkl"))
+        # df.to_pickle(os.path.join(temp_folder_rover, "env_info.pkl"))
+        df.to_csv(os.path.join(temp_folder_rover, "env_info.csv"))
 
         return cls(base_path, env_name)
 

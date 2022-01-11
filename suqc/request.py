@@ -252,29 +252,50 @@ class Request(object):
         # ParameterVariation.generate_vadere_scenarios and
         # ParameterVariation._vars_object()
         for i, request_item in enumerate(self.request_item_list):
-            self.request_item_list[i] = self._single_request(request_item)
+            if request_item.return_code != 0:
+                self.request_item_list[i] = self._single_request(request_item)
 
     def _mp_query(self, njobs):
         # multi process query
         pool = multiprocessing.Pool(processes=njobs)
         self.request_item_list = pool.map(self._single_request, self.request_item_list)
 
-    def run(self, njobs: int = 1):
+    def run(self, njobs: int = 1, retry_if_failed = True, number_retries = 5):
 
+        test_1 = 1 #TODO: remove -> for test purpose only
+
+        retry = 0
+        while all(self.get_simulations_finished()) == False and retry <= number_retries:
+            try:
+                self.run_simulations(njobs)
+
+                # set return_code of sample 2_0 to -1 ("no results provided")
+                if test_1 == 1: #TODO: remove -> for test purpose only
+                    self.request_item_list[2].return_code = -1
+                    test_1 = -1
+            finally:
+                retry +=1
+
+        if self.qoi is not None:
+            self.compiled_run_info = self._compile_run_info()
+            self.compiled_qoi_data = self._compile_qoi()
+
+        return self.compiled_qoi_data, self.compiled_run_info
+
+
+    def get_simulations_finished(self):
+        # succesful simulations have a return_code = 0
+        return [sample.return_code == 0 for sample in self.request_item_list]
+
+
+    def run_simulations(self, njobs):
         # nr of rows = nr of parameter settings = #simulations
         nr_simulations = len(self.request_item_list)
         njobs = njobs_check_and_set(njobs=njobs, ntasks=nr_simulations)
-
         if njobs == 1:
             self._sp_query()
         else:
             self._mp_query(njobs=njobs)
-
-        if self.qoi is not None:
-            self.compiled_qoi_data = self._compile_qoi()
-            self.compiled_run_info = self._compile_run_info()
-
-        return self.compiled_qoi_data, self.compiled_run_info
 
 
 class VariationBase(Request, ServerRequest):

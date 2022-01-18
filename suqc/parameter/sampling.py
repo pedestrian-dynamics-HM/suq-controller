@@ -210,15 +210,13 @@ class ParameterVariationBase(metaclass=abc.ABCMeta):
         df = self.get_simulator_specific_df(simulator)
         # do not use df.iterrows, because this changes the dtype
         # work with dict instead
-
-        parameter_change = dict.fromkeys(df.index, {})
+        parameter_change = {k:{} for k in df.index}
         # assign values to empty dicts (nested)
         for parameter_key, subdict in df.to_dict().items():
             for sample, value in subdict.items():
+                print(f"{sample}{parameter_key}")
                 if not (isinstance(value, np.float) and np.isnan(value)):
                     parameter_change[sample][parameter_key] = value
-                    print(parameter_change)
-                    print()
 
         for (par_id, run_id), row in parameter_change.items():
             yield (par_id, run_id, row)

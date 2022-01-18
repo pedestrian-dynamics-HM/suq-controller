@@ -214,7 +214,6 @@ class ParameterVariationBase(metaclass=abc.ABCMeta):
         # assign values to empty dicts (nested)
         for parameter_key, subdict in df.to_dict().items():
             for sample, value in subdict.items():
-                print(f"{sample}{parameter_key}")
                 if not (isinstance(value, np.float) and np.isnan(value)):
                     parameter_change[sample][parameter_key] = value
 

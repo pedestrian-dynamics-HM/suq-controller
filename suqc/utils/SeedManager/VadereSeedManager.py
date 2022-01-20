@@ -6,7 +6,7 @@ from suqc.utils.SeedManager.SeedManager import SeedManager
 
 
 class VadereSeedManager(SeedManager):
-    def __init__(self, par_variations: List[Dict[str, Any]], rep_count: int = 1, vadere_fixed: bool = True):
+    def __init__(self, par_variations: List[Dict[str, Any]], rep_count: int = 1, vadere_fixed: bool = True, seed=10):
         """SeedManager class for crownet based simulation
 
         Attributes:
@@ -18,7 +18,7 @@ class VadereSeedManager(SeedManager):
         rep_count: int
             repetition count determines how many seed different seed configuration are set per variation
         """
-        super().__init__(par_variations=par_variations, rep_count=rep_count)
+        super().__init__(par_variations=par_variations, rep_count=rep_count, seed=seed)
         self.vadere_seed_range = range(1, 100000)
         self.vadere_fixed = vadere_fixed
         if rep_count == 0:

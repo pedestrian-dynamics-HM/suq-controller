@@ -44,7 +44,8 @@ class Python3Command(Command, ABC):
             self.set_script(file_name)
         time_started = time.time()
         t: str = time.strftime("%H:%M:%S", time.localtime(time_started))
-        print(f"{t}\t Call {str(self)}")
+        #print(f"{t}\t Call {str(self)}")
+        print(f"Call {self._arguments['--run-name']}.")
 
         run_command: List[str] = [self._executable, self._script, *self.arg_list()]
         try:

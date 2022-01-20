@@ -9,7 +9,8 @@ class OmnetSeedManager(SeedManager):
     def __init__(self, par_variations: List[Dict[str, Any]],
                  rep_count: int = 1,
                  omnet_fixed: bool = True,
-                 vadere_fixed: Union[bool, None] = True):
+                 vadere_fixed: Union[bool, None] = True,
+                 seed = 10):
         """SeedManager class for crownet based simulation
 
         Attributes:
@@ -21,7 +22,7 @@ class OmnetSeedManager(SeedManager):
         rep_count: int
             repetition count determines how many seed different seed configuration are set per variation
         """
-        super().__init__(par_variations=par_variations, rep_count=rep_count)
+        super().__init__(par_variations=par_variations, rep_count=rep_count, seed= 10)
         self.omnet_seed_range = range(1, 255)
         self.vadere_seed_range = range(1, 100000)
         self.omnet_fixed = omnet_fixed

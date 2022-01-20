@@ -8,6 +8,7 @@ class RequestItem(object):
         self.base_path = base_path
         self.output_folder = output_folder
         self.scenario_path = scenario_path
+        self.return_code = -1
 
         self.output_path = os.path.join(self.base_path, self.output_folder)
 

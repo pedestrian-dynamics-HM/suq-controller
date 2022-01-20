@@ -1,11 +1,13 @@
 import abc
 import os
 import subprocess
+import json
 import time
 from abc import ABC
 from typing import Tuple, List, Union
 
 from suqc.CommandBuilder.interfaces.Command import Command
+from suqc.requestitem import RequestItem
 
 
 class Python3Command(Command, ABC):
@@ -34,6 +36,9 @@ class Python3Command(Command, ABC):
         self._arguments["--run-name"] = run_name
         return self
 
+    def arg_list(self) -> List[str]:
+        return [self._sub_command, *list(self._arguments)]
+
     def run(self, cwd: str, file_name: Union[str, None] = None) -> Tuple[int, float]:
         if file_name is not None:
             self.set_script(file_name)
@@ -41,14 +46,27 @@ class Python3Command(Command, ABC):
         t: str = time.strftime("%H:%M:%S", time.localtime(time_started))
         print(f"{t}\t Call {str(self)}")
 
-        run_command: List[str] = [self._executable, self._script, self._sub_command] + list(self._arguments)
-        return_code: int = subprocess.check_call(
-            run_command,
-            env=os.environ,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            cwd=cwd,
-            timeout=self.timeout,  
-        )
+        run_command: List[str] = [self._executable, self._script, *self.arg_list()]
+        try:
+            return_code: int = subprocess.check_call(
+                run_command,
+                env=os.environ,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                cwd=cwd,
+                timeout=self.timeout,  
+            )
+        except subprocess.CalledProcessError:
+            print(f"WARNING: {self._arguments['--run-name']} failed.")
+            return_code = -1
+
         process_duration = time.time() - time_started
         return return_code, process_duration
+
+    def write_context(self, ctx_path: str, cwd, r_item: Union[RequestItem, None] = None):
+        ctx_dir, ctx = super().write_context(ctx_path, cwd=cwd, r_item=r_item)
+        ctx["script"] = self._script
+        ctx_json = json.dumps(ctx, indent=2, sort_keys=False)
+        os.makedirs(ctx_dir, exist_ok=True)
+        with open(ctx_path, "w", encoding="utf-8") as fd:
+            fd.write(ctx_json)

@@ -99,14 +99,13 @@ class ParameterVariationBase(metaclass=abc.ABCMeta):
         df_values = self._points.values
         idx_ids = np.arange(start=0, stop=len(par_variations))
         idx_run_ids = np.zeros(len(par_variations), dtype=int)
-        self._points = pd.DataFrame(
-            df_values,
-            index=pd.MultiIndex.from_arrays(
-                [idx_ids, idx_run_ids], names=["id", "run_id"]
-            ),
-            columns=self._points.columns
-        )
+
+        # reset and sort index (do not create a new dataframe here -> data type is lost)
+        self._points["id"] = idx_ids
+        self._points["run_id"] = idx_run_ids
+        self._points.set_index(["id", "run_id"], inplace=True) #
         self._points = self._points.sort_index(axis=1)
+
         return self
 
     def _add_dict_points(self, points: List[dict]):
@@ -209,21 +208,17 @@ class ParameterVariationBase(metaclass=abc.ABCMeta):
     def par_iter(self, simulator=None):
 
         df = self.get_simulator_specific_df(simulator)
+        # do not use df.iterrows, because this changes the dtype
+        # work with dict instead
+        parameter_change = {k:{} for k in df.index}
+        # assign values to empty dicts (nested)
+        for parameter_key, subdict in df.to_dict().items():
+            for sample, value in subdict.items():
+                if not (isinstance(value, np.float) and np.isnan(value)):
+                    parameter_change[sample][parameter_key] = value
 
-        for (par_id, run_id), row in df.iterrows():
-            # TODO: this is not nice coding, however, there are some issues. See issue #40
-            parameter_variation = dict(row)
-            delete_keys = list()
-
-            # nan entries are not considered and therefore removed
-            for k, v in parameter_variation.items():
-                if isinstance(v, np.float) and np.isnan(v):
-                    delete_keys.append(k)
-
-            for dk in delete_keys:
-                del parameter_variation[dk]
-
-            yield (par_id, run_id, parameter_variation)
+        for (par_id, run_id), row in parameter_change.items():
+            yield (par_id, run_id, row)
 
     def get_simulator_specific_df(self, simulator):
         if self.is_multiple_simulators():

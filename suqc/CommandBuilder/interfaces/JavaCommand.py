@@ -1,9 +1,10 @@
 import abc
 import subprocess
 import time
-from typing import Tuple, List, Iterator
+from typing import Tuple, List, Iterator, Union
 
 from suqc.CommandBuilder.interfaces.Command import Command
+from suqc.requestitem import RequestItem
 
 
 class JavaCommand(Command):
@@ -36,15 +37,20 @@ class JavaCommand(Command):
                f"{self._arguments}"\
             .strip()
 
+    def arg_list(self) -> List[str]:
+        args =[]
+        if self._options:
+            args.extend(self._options)
+        args.extend(self._sub_command.split(" "))
+        if self._main_class:
+            args.append(self._main_class)
+        if self._arguments:
+            args.extend(list(self._arguments))
+        return args
+    
     def __iter__(self) -> Iterator[str]:
         run_command: List[str] = [self._executable]
-        if self._options:
-            run_command += self._options
-        run_command += self._sub_command.split(" ")
-        if self._main_class:
-            run_command += [self._main_class]
-        if self._arguments:
-            run_command += list(self._arguments)
+        run_command.extend(self.arg_list())
         return run_command.__iter__()
 
     def _set_executable(self) -> None:
@@ -99,3 +105,6 @@ class JavaCommand(Command):
             output_subprocess["stderr"] = exception.stderr
 
         return return_code, process_duration, output_subprocess
+
+    def write_context(self, ctx_path: str, cwd: str, r_item: Union[RequestItem, None] = None):
+        raise NotImplemented()

@@ -43,7 +43,7 @@ if __name__ == "__main__":
                    '*.radioMedium.obstacleLoss.typename': 'DielectricObstacleLoss'}},
         {'vadere': {'sources.[id==1].distributionParameters.numberPedsPerSecond': 0.05},
          'omnet': {'*.misc[0].app[0].incidentTime': '10s',
-                   '*.radioMedium.obstacleLoss.typename': 'DielectricObstacleLoss'}},
+                   '*.radioMedium.obstacleLoss.typename': 'DielectricObstacleLossXXX'}},
         {'vadere': {'sources.[id==2].distributionParameters.numberPedsPerSecond': 0.0375},
          'omnet': {'*.misc[0].app[0].incidentTime': '10s',
                    '*.radioMedium.obstacleLoss.typename': 'DielectricObstacleLoss'}},
@@ -83,7 +83,7 @@ if __name__ == "__main__":
         .omnet_tag("latest") \
         .qoi(qoi) \
         .experiment_label("out") \
-        # .reuse_policy("keep")
+        #.reuse_policy("keep")
 
     setup = CoupledDictVariation(
         ini_path=path2ini,

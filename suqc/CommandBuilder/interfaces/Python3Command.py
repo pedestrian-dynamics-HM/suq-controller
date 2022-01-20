@@ -44,8 +44,7 @@ class Python3Command(Command, ABC):
             self.set_script(file_name)
         time_started = time.time()
         t: str = time.strftime("%H:%M:%S", time.localtime(time_started))
-        #print(f"{t}\t Call {str(self)}")
-        print(f"Call {self._arguments['--run-name']}.")
+        print(f"{t}\t Call {str(self)}")
 
         run_command: List[str] = [self._executable, self._script, *self.arg_list()]
         try:
@@ -58,7 +57,7 @@ class Python3Command(Command, ABC):
                 timeout=self.timeout,  
             )
         except subprocess.CalledProcessError:
-            print(f"Simulation failed: {run_command}")
+            print(f"WARNING: {self._arguments['--run-name']} failed.")
             return_code = -1
 
         process_duration = time.time() - time_started

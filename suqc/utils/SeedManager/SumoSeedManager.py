@@ -7,7 +7,7 @@ from suqc.utils.SeedManager.SeedManager import SeedManager
 
 
 class SumoSeedManager(SeedManager):
-    def __init__(self, par_variations: List[Dict[str, Any]], rep_count: int = 1, omnet_fixed: bool = True, sumo_fixed:bool = True):
+    def __init__(self, par_variations: List[Dict[str, Any]], rep_count: int = 1, omnet_fixed: bool = True, sumo_fixed:bool =True, seed=10):
         """SeedManager class for crownet based simulation
 
         Attributes:
@@ -19,7 +19,7 @@ class SumoSeedManager(SeedManager):
         rep_count: int
             repetition count determines how many seed different seed configuration are set per variation
         """
-        super().__init__(par_variations=par_variations, rep_count=rep_count)
+        super().__init__(par_variations=par_variations, rep_count=rep_count, seed=seed)
         self.omnet_seed_range = range(1, 255)
         self.omnet_fixed = omnet_fixed
         self.sumo_fixed = sumo_fixed

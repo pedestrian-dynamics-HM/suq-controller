@@ -193,9 +193,6 @@ class AbstractEnvironmentManager(object):
             json.dump(content, outfile, indent=4)
         return scenario_path
 
-    def get_temp_folder(self):
-        raise NotImplemented
-
     def get_env_outputfolder_path(self):
         raise NotImplemented
 
@@ -232,11 +229,6 @@ class AbstractEnvironmentManager(object):
 
         info = pd.DataFrame(data=info, index=[0])
         cls.env_info_df = info
-
-    def write_parameter_info(self, parameter):
-        file_path = os.path.join(self.get_temp_folder(), "parameter.pkl")
-        parameter.to_pickle(file_path)
-
 
 class VadereEnvironmentManager(AbstractEnvironmentManager):
     PREFIX_BASIS_SCENARIO = "BASIS_"
@@ -330,7 +322,6 @@ class CoupledEnvironmentManager(AbstractEnvironmentManager):
     simulation_runs_output_folder = "simulation_runs"
     simulation_runs_single_folder_name = "Sample_"
     run_file = "run_script.py"
-    temp_folder_rover = "temp"
     simulators = {
         "vadere": {
             "subdir": "vadere/scenarios",
@@ -480,18 +471,6 @@ class CoupledEnvironmentManager(AbstractEnvironmentManager):
 
         if os.path.exists(path_output_folder_rover) is False:
             os.mkdir(path_output_folder_rover)
-
-        temp_folder_rover = os.path.join(
-            path_output_folder, CoupledEnvironmentManager.temp_folder_rover,
-        )
-
-        if handle_existing != "write_in":
-            if os.path.exists(temp_folder_rover):
-                shutil.rmtree(temp_folder_rover)
-            os.mkdir(temp_folder_rover)
-
-        df = cls.env_info_df
-        df.to_pickle(os.path.join(temp_folder_rover, "env_info.pkl"))
 
         return cls(base_path, env_name)
 

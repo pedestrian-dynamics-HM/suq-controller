@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import glob
+import json
 import multiprocessing
 import os
 import shutil
@@ -177,7 +178,7 @@ class Request(object):
 
     def _compile_qoi(self):
 
-        qoi_results = [item_.qoi_result for item_ in self.request_item_list]
+        qoi_results = [item_.qoi_result for item_ in self._successful_simulations()]
 
         filenames = None
         for ires in qoi_results:
@@ -222,7 +223,7 @@ class Request(object):
                     item_.required_time,
                     item_.return_code,
                 )
-                for item_ in self.request_item_list
+                for item_ in self._successful_simulations()
             ]
         df = pd.DataFrame(
             data,
@@ -295,6 +296,9 @@ class Request(object):
     def get_nr_of_unfinished_sims(self):
         is_finished = np.array(self._simulations_finished())
         return len(is_finished) - self.get_nr_of_finished_sims()
+
+    def _successful_simulations(self):
+        return filter(lambda item: item.return_code != -1, self.request_item_list)
 
     def _simulations_finished(self):
         # succesful simulations have a return_code = 0

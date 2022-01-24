@@ -44,7 +44,7 @@ if __name__ == "__main__":
                    '*.radioMedium.obstacleLoss.typename': 'DielectricObstacleLoss'}},
         {'vadere': {'sources.[id==1].distributionParameters.numberPedsPerSecond': 0.05},
          'omnet': {'*.misc[0].app[0].incidentTime': '10s',
-                   '*.radioMedium.obstacleLoss.typename': 'DielectricObstacleLossXXX'}},
+                   '*.radioMedium.obstacleLoss.typename': 'DielectricObstacleLoss'}},
         {'vadere': {'sources.[id==2].distributionParameters.numberPedsPerSecond': 0.0375},
          'omnet': {'*.misc[0].app[0].incidentTime': '10s',
                    '*.radioMedium.obstacleLoss.typename': 'DielectricObstacleLoss'}},
@@ -105,8 +105,6 @@ if __name__ == "__main__":
         )
 
     if run_local:
-        out = StringIO()
-        sys.stdout = out
         par_var, data = setup.run(1)
     else:
         par_var, data = setup.remote(-1)

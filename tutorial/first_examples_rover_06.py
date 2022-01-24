@@ -100,7 +100,7 @@ if __name__ == "__main__":
             output = out.getvalue().strip().split("\n")
             regex = re.compile(r"Retry attempt:")
             retry_string = filter(lambda text: regex.match(text), output)
-            if len(list(retry_string)) == 5:
+            if len(list(retry_string)) == 6:
                 print("Do something for the expected amount of retries.")
             else:
                 warnings.warn("Did not found the 6 expected retries.")

@@ -2,6 +2,8 @@
 # !/usr/bin/python3
 
 import sys
+import re
+import warnings
 from io import StringIO
 
 from suqc.CommandBuilder.VadereOppCommand import VadereOppCommand
@@ -21,7 +23,7 @@ run_local = True
 
 
 if __name__ == "__main__":
-    output_folder = os.path.join(os.getcwd(), "first_examples_rover_01")
+    output_folder = os.path.join(os.getcwd(), "first_examples_rover_06")
 
     ## Define the simulation to be used
     # A rover simulation is defined by an "omnetpp.ini" file and its corresponding directory.
@@ -44,25 +46,10 @@ if __name__ == "__main__":
                    '*.radioMedium.obstacleLoss.typename': 'DielectricObstacleLoss'}},
         {'vadere': {'sources.[id==1].distributionParameters.numberPedsPerSecond': 0.05},
          'omnet': {'*.misc[0].app[0].incidentTime': '10s',
-                   '*.radioMedium.obstacleLoss.typename': 'DielectricObstacleLoss'}},
-        {'vadere': {'sources.[id==2].distributionParameters.numberPedsPerSecond': 0.0375},
+                   '*.radioMedium.obstacleLoss.typename': 'DielectricObstacleLossXXX'}},
+        {'vadere': {'sources.[id==1].distributionParameters.numberPedsPerSecond': 0.01},
          'omnet': {'*.misc[0].app[0].incidentTime': '10s',
                    '*.radioMedium.obstacleLoss.typename': 'DielectricObstacleLoss'}},
-        {'vadere': {'sources.[id==2].distributionParameters.numberPedsPerSecond': 0.05},
-         'omnet': {'*.misc[0].app[0].incidentTime': '10s',
-                   '*.radioMedium.obstacleLoss.typename': 'DielectricObstacleLoss'}},
-        {'vadere': {'sources.[id==5].distributionParameters.numberPedsPerSecond': 0.0375},
-         'omnet': {'*.misc[0].app[0].incidentTime': '10s',
-                   '*.radioMedium.obstacleLoss.typename': 'DielectricObstacleLoss'}},
-        {'vadere': {'sources.[id==5].distributionParameters.numberPedsPerSecond': 0.05},
-         'omnet': {'*.misc[0].app[0].incidentTime': '10s',
-                   '*.radioMedium.obstacleLoss.typename': 'DielectricObstacleLoss'}},
-        {'vadere': {'sources.[id==6].distributionParameters.numberPedsPerSecond': 0.0375},
-         'omnet': {'*.misc[0].app[0].incidentTime': '10s',
-                   '*.radioMedium.obstacleLoss.typename': 'DielectricObstacleLoss'}},
-        {'vadere': {'sources.[id==6].distributionParameters.numberPedsPerSecond': 0.05},
-         'omnet': {'*.misc[0].app[0].incidentTime': '10s',
-                   '*.radioMedium.obstacleLoss.typename': 'DielectricObstacleLoss'}}
     ]
     par_var = OmnetSeedManager(par_variations=par_var, rep_count=reps, vadere_fixed=False, omnet_fixed=False) \
         .get_new_seed_variation()
@@ -84,7 +71,6 @@ if __name__ == "__main__":
         .omnet_tag("latest") \
         .qoi(qoi) \
         .experiment_label("out") \
-        #.reuse_policy("keep")
 
     setup = CoupledDictVariation(
         ini_path=path2ini,
@@ -105,7 +91,22 @@ if __name__ == "__main__":
         )
 
     if run_local:
-        par_var, data = setup.run(1)
+        saved_stdout = sys.stdout
+        try:
+            out = StringIO()
+            sys.stdout = out
+            par_var, data = setup.run(1)
+            # check for the amount of retries
+            output = out.getvalue().strip().split("\n")
+            regex = re.compile(r"Retry attempt:")
+            retry_string = filter(lambda text: regex.match(text), output)
+            if len(list(retry_string)) == 6:
+                print("Do something for the expected amount of retries.")
+            else:
+                warnings.warn("Did not found the 6 expected retries.")
+        finally:
+            sys.stdout = saved_stdout
+
     else:
         par_var, data = setup.remote(-1)
 

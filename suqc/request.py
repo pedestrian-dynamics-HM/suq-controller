@@ -546,12 +546,6 @@ class CoupledDictVariation(VariationBase, ServerRequest):
             if return_code != 0:
                 return request_item
 
-            filepath = f"{dirname}/results/**/*.scenario"
-            # TODO add flowcontrol.d here
-            file = glob.glob(filepath, recursive=True)
-
-            dirpath = os.path.dirname(file[0])
-
             is_results = self._interpret_return_value(
                 return_code, request_item.parameter_id
             )
@@ -560,7 +554,7 @@ class CoupledDictVariation(VariationBase, ServerRequest):
                 result = self.qoi.read_and_extract_qois(
                     par_id=request_item.parameter_id,
                     run_id=request_item.run_id,
-                    output_path=dirpath,
+                    output_path=os.path.join(dirname, "results"),
                 )
             else:
                 result = None

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 
-import os
+import glob
 import re
-import time
 from typing import *
 
 import pandas as pd
+
 from suqc.environment import VadereEnvironmentManager
 from suqc.utils.dict_utils import deep_dict_lookup
 
@@ -115,8 +115,18 @@ class QuantityOfInterest(object):
         read_data = dict()
 
         for k in self.req_qois:
-            filepath = os.path.join(output_path, k.filename)
-            df_data = self._read_csv(k, filepath)
+
+            filepath = f"{output_path}/**/{k.filename}"
+            filepath = glob.glob(filepath, recursive=True)
+
+            if len(filepath) == 1:
+                pass
+            elif len(filepath) == 0:
+                raise RuntimeError(f"{k.filename}: not found in {output_path}.")
+            else:
+                raise RuntimeError(f"{k.filename}: multiple instances found in {output_path}.")
+
+            df_data = self._read_csv(k, filepath[0])
             read_data[k.filename] = self._add_parid2idx(
                 df_data, par_id, run_id
             )  # filename is identifier for QoI
